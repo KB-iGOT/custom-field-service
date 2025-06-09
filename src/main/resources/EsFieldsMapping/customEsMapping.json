@@ -1,0 +1,52 @@
+{
+  "customFieldId": {
+    "type": "keyword"
+  },
+  "type": {
+    "type": "keyword"
+  },
+  "communityId": {
+    "type": "keyword"
+  },
+  "description": {
+    "type": "text"
+  },
+  "organisationId": {
+    "type": "keyword"
+  },
+  "createdBy": {
+    "type": "keyword"
+  },
+  "isActive": {
+    "type": "boolean"
+  },
+  "attributeName": {
+    "type": "keyword"
+  },
+  "isMandatory": {
+    "type": "boolean"
+  },
+  "name": {
+    "type": "keyword"
+  },
+  "createdOn": {
+    "type": "date",
+    "format": [
+      "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+      "epoch_millis"
+    ]
+  },
+  "updatedOn": {
+    "type": "date",
+    "format": [
+      "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+      "epoch_millis"
+    ]
+  },
+  "updatedBy": {
+    "type": "keyword"
+  },
+  "customFieldData": {
+    "type": "object"
+  }
+}

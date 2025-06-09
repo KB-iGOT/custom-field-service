@@ -1,0 +1,56 @@
+package com.igot.cb.customFields.controller;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.igot.cb.customFields.service.CustomFieldsService;
+import com.igot.cb.pores.elasticsearch.dto.SearchCriteria;
+import com.igot.cb.pores.util.ApiResponse;
+import com.igot.cb.pores.util.Constants;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/customFields")
+public class CustomFieldsController {
+    @Autowired
+    private CustomFieldsService customFieldsService;
+
+    @PostMapping("/create")
+    public ResponseEntity<ApiResponse> createCustomFields(@RequestBody JsonNode customFieldsData,
+                                                          @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = customFieldsService.createCustomFields(customFieldsData, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @GetMapping("/read/{customFieldId}")
+    public ResponseEntity<ApiResponse> readCustomField(
+            @PathVariable String customFieldId,
+            @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = customFieldsService.readCustomField(customFieldId, token);
+        return ResponseEntity.status(response.getResponseCode()).body(response);
+    }
+
+    @PutMapping("/update/{customFieldId}")
+    public ResponseEntity<ApiResponse> updateCustomField(
+            @PathVariable String customFieldId,
+            @RequestBody JsonNode customFieldData,
+            @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = customFieldsService.updateCustomField(customFieldId, customFieldData, token);
+        return ResponseEntity.status(response.getResponseCode()).body(response);
+    }
+
+    @DeleteMapping("/delete/{customFieldId}")
+    public ResponseEntity<ApiResponse> deleteCustomField(
+            @PathVariable String customFieldId,
+            @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = customFieldsService.deleteCustomField(customFieldId, token);
+        return ResponseEntity.status(response.getResponseCode()).body(response);
+    }
+
+    @PostMapping("/search")
+    public ResponseEntity<ApiResponse> searchCustomFields(
+            @RequestBody SearchCriteria searchCriteria) {
+        ApiResponse response = customFieldsService.searchCustomFields(searchCriteria);
+        return ResponseEntity.status(response.getResponseCode()).body(response);
+    }
+}

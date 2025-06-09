@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["text", "masterList"]
+    },
+    "description": {
+      "type": "string"
+    },
+    "organisationId": {
+      "type": "string"
+    },
+    "customFieldData": {
+      "type": "string"
+    },
+    "isMandatory": {
+      "type": "boolean"
+    },
+    "attributeName": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "validation":{
+      "type": "string",
+      "enum": ["regex", "alphaNumeric", "datetime"]
+    }
+  },
+  "required": [
+    "type",
+    "name",
+    "organisationId",
+    "customFieldData",
+    "attributeName",
+    "isMandatory",
+    "validation"
+  ],
+  "additionalProperties": false
+}
