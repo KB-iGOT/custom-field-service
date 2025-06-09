@@ -11,5 +11,5 @@ RUN apt-get update \
         xfonts-base \
         xz-utils
 
-COPY cb-ext-course-service-0.0.1-SNAPSHOT.jar /opt/
+COPY custom-field-service-0.0.1-SNAPSHOT.jar /opt/
 CMD ["/bin/bash", "-c", "java -XX:+PrintFlagsFinal $JAVA_OPTIONS -XX:+UnlockExperimentalVMOptions -jar /opt/custom-field-service-0.0.1-SNAPSHOT.jar"]
