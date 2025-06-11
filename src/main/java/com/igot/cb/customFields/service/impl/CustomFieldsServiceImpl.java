@@ -74,7 +74,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             customFieldsDataObjectNode.put(Constants.CREATED_ON, formattedCurrentTime);
             customFieldsDataObjectNode.put(Constants.UPDATED_ON, formattedCurrentTime);
             customFieldsDataObjectNode.put(Constants.IS_ACTIVE, true);
-            customFieldsDataObjectNode.put(Constants.IS_ENABLED, true);
+            customFieldsDataObjectNode.put(Constants.IS_ENABLED, customFieldsData.get(Constants.IS_ENABLED).asBoolean(false));
             customFieldsDataObjectNode.put(Constants.IS_MANDATORY, customFieldsData.get(Constants.IS_MANDATORY).asBoolean(false));
             // Create and populate entity
             CustomFieldEntity customField = new CustomFieldEntity();

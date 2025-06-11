@@ -60,7 +60,7 @@ public class CustomFieldsController {
     @PostMapping("/masterList/create")
     public ResponseEntity<ApiResponse> uploadCustomFieldHierarchy(
             @RequestParam("file") MultipartFile multipartFile,
-            @RequestParam("customFieldsMasterData") String customFieldsMasterDataJson,
+            @RequestParam("metadata") String customFieldsMasterDataJson,
             @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
         ApiResponse response = customFieldsService.uploadMasterListCustomField(multipartFile, customFieldsMasterDataJson, token);
         return new ResponseEntity<>(response, response.getResponseCode());
