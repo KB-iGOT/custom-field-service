@@ -22,4 +22,10 @@ public class CbServerProperties {
   @Value("${customField.Validation.File.path}")
   private String customFieldValidationFilePath;
 
+  @Value("${custom.field.max.level}")
+  private int customFieldMaxLevel;
+
+  @Value("${customField.list.validation.file.path}")
+  private String customFieldListValidationFilePath;
+
 }

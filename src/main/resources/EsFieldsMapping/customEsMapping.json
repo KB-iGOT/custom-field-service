@@ -47,6 +47,12 @@
     "type": "keyword"
   },
   "customFieldData": {
-    "type": "object"
+    "type": "nested"
+  },
+  "isEnabled": {
+    "type": "boolean"
+  },
+  "validation": {
+    "type": "keyword"
   }
 }

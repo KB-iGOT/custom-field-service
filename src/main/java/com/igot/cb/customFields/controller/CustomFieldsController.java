@@ -8,6 +8,9 @@ import com.igot.cb.pores.util.Constants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/customFields")
@@ -27,7 +30,7 @@ public class CustomFieldsController {
             @PathVariable String customFieldId,
             @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
         ApiResponse response = customFieldsService.readCustomField(customFieldId, token);
-        return ResponseEntity.status(response.getResponseCode()).body(response);
+        return new ResponseEntity<>(response, response.getResponseCode());
     }
 
     @PutMapping("/update/{customFieldId}")
@@ -36,7 +39,7 @@ public class CustomFieldsController {
             @RequestBody JsonNode customFieldData,
             @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
         ApiResponse response = customFieldsService.updateCustomField(customFieldId, customFieldData, token);
-        return ResponseEntity.status(response.getResponseCode()).body(response);
+        return new ResponseEntity<>(response, response.getResponseCode());
     }
 
     @DeleteMapping("/delete/{customFieldId}")
@@ -44,13 +47,22 @@ public class CustomFieldsController {
             @PathVariable String customFieldId,
             @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
         ApiResponse response = customFieldsService.deleteCustomField(customFieldId, token);
-        return ResponseEntity.status(response.getResponseCode()).body(response);
+        return new ResponseEntity<>(response, response.getResponseCode());
     }
 
     @PostMapping("/search")
     public ResponseEntity<ApiResponse> searchCustomFields(
             @RequestBody SearchCriteria searchCriteria) {
         ApiResponse response = customFieldsService.searchCustomFields(searchCriteria);
-        return ResponseEntity.status(response.getResponseCode()).body(response);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/masterList/create")
+    public ResponseEntity<ApiResponse> uploadCustomFieldHierarchy(
+            @RequestParam("file") MultipartFile multipartFile,
+            @RequestParam("customFieldsMasterData") String customFieldsMasterDataJson,
+            @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = customFieldsService.uploadMasterListCustomField(multipartFile, customFieldsMasterDataJson, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
     }
 }

@@ -47,11 +47,12 @@ public class PayloadValidation {
   private void validateObject(JsonSchema schema, JsonNode objectNode) {
     Set<ValidationMessage> validationMessages = schema.validate(objectNode);
     if (!validationMessages.isEmpty()) {
-      StringBuilder errorMessage = new StringBuilder("Validation error(s): \n");
-      for (ValidationMessage message : validationMessages) {
-        errorMessage.append(message.getMessage()).append("\n");
-      }
-      logger.error("Validation Error", errorMessage.toString());
+      StringBuilder errorMessage = new StringBuilder("Validation error(s):");
+      validationMessages.forEach(message ->
+              errorMessage.append(" - ").append(message.getMessage())
+      );
+
+      log.error("Validation Error: {}", errorMessage);
       throw new CustomException("Validation Error", errorMessage.toString(), HttpStatus.BAD_REQUEST);
     }
   }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.igot.cb.pores.elasticsearch.dto.SearchCriteria;
 import com.igot.cb.pores.util.ApiResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public interface CustomFieldsService {
@@ -17,4 +18,6 @@ public interface CustomFieldsService {
     ApiResponse deleteCustomField(String customFieldId, String token);
 
     ApiResponse searchCustomFields(SearchCriteria searchCriteria);
+
+    ApiResponse uploadMasterListCustomField(MultipartFile multipartFile, String customFieldsMasterDataJson, String token);
 }
