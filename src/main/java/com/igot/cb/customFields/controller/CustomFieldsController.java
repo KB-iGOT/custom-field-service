@@ -13,7 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/customFields")
+@RequestMapping("/customFields/v1")
 public class CustomFieldsController {
     @Autowired
     private CustomFieldsService customFieldsService;
