@@ -74,6 +74,25 @@ public class Constants {
     public static final String API_VERSION_1 = "1.0";
     public static final String UPDATED_BY = "updatedBy";
     public static final String ORGANISATION_ID = "organisationId";
+    public static final String CREATE_CUSTOM_FIELD_API = "customFields.create.api";
+    public static final String IS_ENABLED = "isEnabled";
+    public static final String CUSTOM_FIELD_DATA = "customFieldData";
+    public static final String ONLY_EXCEL_FILES_ALLOWED = "Only Excel files (.xlsx, .xls) are allowed";
+    public static final String UPLOADED_FILE_IS_EMPTY = "Uploaded file is empty";
+    public static final String EXCEL_HEADER_ROW_REQUIRED = "Excel file must have a header row";
+    public static final String EXCEL_MORE_COLUMNS_THAN_LEVELS = "Excel file has more columns (%d) than defined levels in customFieldData (%d).";
+    public static final String EXCEL_MORE_THAN_MAX_LEVELS = "Excel file cannot have more than %d columns for levels";
+    public static final String CUSTOM_FIELD_DATA_LEVELS_EXCEED = "customFieldData levels cannot exceed %d.";
+    public static final String CUSTOM_FIELD_DATA_NON_EMPTY = "customFieldData must be a non-empty list";
+    public static final String HEADER_MISMATCH = "Header in the excel file '%s' does not match expected attributeName '%s' at level %d";
+    public static final String LEVEL_MISMATCH = "Level mismatch at column %d: expected %d, found %d";
+    public static final String ERROR_READING_EXCEL = "Error reading Excel file: %s";
+    public static final String CUSTOM_FIELD = "CUSTOM_FIELD_";
+    public static final String ATTRIBUTE_NAME = "attributeName";
+    public static final String LEVEL = "level";
+    public static final String XLSX = ".xlsx";
+    public static final String XLS = ".xls";
+    public static final String INVALID_JSON_CUSTOM_FIELDS_MASTER_DATA = "Invalid JSON for customFieldsMasterData: ";
 
     private Constants() {
     }
