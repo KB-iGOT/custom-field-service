@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "customFieldId": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["masterList"]
+    },
+    "description": {
+      "type": "string"
+    },
+    "organisationId": {
+      "type": "string"
+    },
+    "isMandatory": {
+      "type": "boolean"
+    },
+    "attributeName": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "validation": {
+      "type": "string"
+    },
+    "isEnabled": {
+      "type": "boolean"
+    },
+    "customFieldData": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["attributeName", "level"],
+        "properties": {
+          "attributeName": { "type": "string" },
+          "level": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  },
+  "required": [
+    "customFieldId",
+    "type",
+    "name",
+    "organisationId",
+    "attributeName",
+    "isMandatory",
+    "customFieldData",
+    "isEnabled"
+  ],
+  "additionalProperties": false
+}

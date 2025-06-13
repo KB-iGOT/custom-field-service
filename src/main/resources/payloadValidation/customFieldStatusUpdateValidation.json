@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "customFieldId": {
+      "type": "string"
+    },
+    "isEnabled": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "customFieldId",
+    "isEnabled"
+  ],
+  "additionalProperties": false
+}

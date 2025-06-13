@@ -20,4 +20,8 @@ public interface CustomFieldsService {
     ApiResponse searchCustomFields(SearchCriteria searchCriteria);
 
     ApiResponse uploadMasterListCustomField(MultipartFile multipartFile, String customFieldsMasterDataJson, String token);
+
+    ApiResponse updateMasterListCustomField(MultipartFile file, String customFieldsMasterDataJson, String token);
+
+    ApiResponse updateCustomFieldStatus(JsonNode updateCustomFieldStatusData, String token);
 }

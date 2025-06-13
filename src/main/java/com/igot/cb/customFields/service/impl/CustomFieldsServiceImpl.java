@@ -180,22 +180,24 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             // Validate user token
             String userId = accessTokenValidator.fetchUserIdFromAccessToken(token);
             if (StringUtils.isBlank(userId)) {
-                response.getParams().setStatus(Constants.FAILED);
-                response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
-                response.setResponseCode(HttpStatus.UNAUTHORIZED);
+                ProjectUtil.returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
                 return response;
             }
 
             // Check if field exists and is active
             Optional<CustomFieldEntity> customFieldOpt = customFieldRepository.findByCustomFiledIdAndIsActiveTrue(customFieldId);
             if (customFieldOpt.isEmpty()) {
-                response.getParams().setStatus(Constants.FAILED);
-                response.getParams().setErrMsg("Custom field not found or is inactive with ID: " + customFieldId);
-                response.setResponseCode(HttpStatus.NOT_FOUND);
+                ProjectUtil.returnErrorMsg("Custom field not found or is inactive with ID: " + customFieldId, HttpStatus.NOT_FOUND, response, Constants.FAILED);
                 return response;
             }
 
             CustomFieldEntity customField = customFieldOpt.get();
+            JsonNode originalData = customField.getCustomFieldData();
+
+            if(originalData.has(Constants.ORGANISATION_ID) && !originalData.get(Constants.ORGANISATION_ID).asText().equals(customFieldsData.get(Constants.ORGANISATION_ID).asText())) {
+                ProjectUtil.returnErrorMsg("Organisation ID cannot be changed", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
 
             // Update entity data
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
@@ -205,11 +207,11 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             customFieldsDataObjectNode.put(Constants.ORGANISATION_ID, customFieldOpt.get().getCustomFieldData().get(Constants.ORGANISATION_ID).asText());
             customFieldsDataObjectNode.put(Constants.UPDATED_BY, userId); // Add the updated by field
             customFieldsDataObjectNode.put(Constants.UPDATED_ON, formattedCurrentTime);
-            customFieldsDataObjectNode.put(Constants.IS_MANDATORY, customFieldsData.get(Constants.IS_MANDATORY).asBoolean(false));
-            customFieldsDataObjectNode.put(Constants.IS_ACTIVE, true);
+            customFieldsDataObjectNode.put(Constants.IS_ENABLED, customFieldsData.get(Constants.IS_ENABLED).asBoolean(originalData.get(Constants.IS_ENABLED).asBoolean()));
+            customFieldsDataObjectNode.put(Constants.IS_MANDATORY, customFieldsData.get(Constants.IS_MANDATORY).asBoolean(originalData.get(Constants.IS_MANDATORY).asBoolean()));
+            customFieldsDataObjectNode.put(Constants.IS_ACTIVE, originalData.get(Constants.IS_ACTIVE).asBoolean(originalData.get(Constants.IS_ACTIVE).asBoolean()));
 
             // Keep original creation info
-            JsonNode originalData = customField.getCustomFieldData();
             if (originalData.has(Constants.CREATED_BY)) {
                 customFieldsDataObjectNode.put(Constants.CREATED_BY, originalData.get(Constants.CREATED_BY).asText());
             }
@@ -219,7 +221,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
 
             // Rest of your existing code...
             customField.setCustomFieldData(customFieldsDataObjectNode);
-            customField.setIsMandatory(customFieldsData.get(Constants.IS_MANDATORY).asBoolean(false));
+            customField.setIsMandatory(customFieldsData.get(Constants.IS_MANDATORY).asBoolean(originalData.get(Constants.IS_MANDATORY).asBoolean()));
             customField.setUpdatedOn(currentTime);
             customFieldRepository.save(customField);
 
@@ -237,18 +239,15 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             // Update Redis cache
             JsonNode responseNode = objectMapper.valueToTree(customFieldMap);
             cacheService.putCache("CUSTOM_FIELD_" + customFieldId, responseNode);
-
             response.setResponseCode(HttpStatus.OK);
             response.setMessage(Constants.SUCCESS);
             response.setResult(customFieldMap);
 
         } catch (Exception e) {
+            ProjectUtil.returnErrorMsg("Failed to update custom field: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
             log.error("Failed to update custom field: {}", e.getMessage(), e);
-            response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
-            response.getParams().setErrMsg("FAILED_TO_UPDATE_CUSTOM_FIELD");
-            response.setMessage(Constants.FAILED);
+            return response;
         }
-
         return response;
     }
 
@@ -261,18 +260,14 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             // Validate user token
             String userId = accessTokenValidator.fetchUserIdFromAccessToken(token);
             if (StringUtils.isBlank(userId)) {
-                response.getParams().setStatus(Constants.FAILED);
-                response.getParams().setErrMsg(Constants.INVALID_AUTH_TOKEN);
-                response.setResponseCode(HttpStatus.UNAUTHORIZED);
+                ProjectUtil.returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
                 return response;
             }
 
             // Check if field exists
             Optional<CustomFieldEntity> customFieldOpt = customFieldRepository.findByCustomFiledIdAndIsActiveTrue(customFieldId);
             if (customFieldOpt.isEmpty()) {
-                response.getParams().setStatus(Constants.FAILED);
-                response.getParams().setErrMsg("Custom field not found with ID: " + customFieldId);
-                response.setResponseCode(HttpStatus.NOT_FOUND);
+                ProjectUtil.returnErrorMsg("Custom field not found with ID: " + customFieldId, HttpStatus.NOT_FOUND, response, Constants.FAILED);
                 return response;
             }
 
@@ -312,15 +307,14 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             response.setResponseCode(HttpStatus.OK);
             response.setMessage(Constants.SUCCESS);
             Map<String, Object> resultMap = new HashMap<>();
-            resultMap.put("customFieldId", customFieldId);
-            resultMap.put("status", "deleted");
+            resultMap.put(Constants.CUSTOM_FIELD_ID_PARAM, customFieldId);
+            resultMap.put(Constants.STATUS, Constants.DELETED);
             response.setResult(resultMap);
 
         } catch (Exception e) {
             log.error("Failed to delete custom field: {}", e.getMessage(), e);
-            response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
-            response.getParams().setErrMsg("FAILED_TO_DELETE_CUSTOM_FIELD");
-            response.setMessage(Constants.FAILED);
+            ProjectUtil.returnErrorMsg("Failed to delete custom field: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
+            return response;
         }
 
         return response;
@@ -353,18 +347,16 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
 
             response.setResponseCode(HttpStatus.OK);
             response.setMessage(Constants.SUCCESS);
-            response.getResult().put("searchResults", searchResult);
-
+            response.getResult().put(Constants.SEARCH_RESULTS, searchResult);
         } catch (Exception e) {
             log.error("Failed to search custom fields: {}", e.getMessage(), e);
-            response.setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR);
-            response.getParams().setErrMsg("FAILED_TO_SEARCH_CUSTOM_FIELDS");
-            response.setMessage(Constants.FAILED);
+            ProjectUtil.returnErrorMsg("Failed to search custom fields: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
+            return response;
         }
-
         return response;
     }
 
+    @Override
     public ApiResponse uploadMasterListCustomField(MultipartFile file, String customFieldsMasterDataJson, String token) {
         ApiResponse response = ProjectUtil.createDefaultResponse(Constants.CREATE_CUSTOM_FIELD_API);
         log.info("CustomFieldsServiceImpl::uploadMasterListCustomField: Uploading master list custom field");
@@ -393,10 +385,13 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
 
         String fileName = file.getOriginalFilename();
         String contentType = file.getContentType();
+        List<String> extensions = Arrays.asList(cbServerProperties.getAllowedExtensions().split(","));
+        List<String> contentTypes = Arrays.asList(cbServerProperties.getAllowedContentTypes().split(","));
+
         if (fileName == null ||
-                !(fileName.endsWith(Constants.XLSX) || fileName.endsWith(Constants.XLS)) ||
-                !(contentType != null && (contentType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                        || contentType.equals("application/vnd.ms-excel")))) {
+                extensions.stream().noneMatch(fileName::endsWith) ||
+                contentType == null ||
+                contentTypes.stream().noneMatch(contentType::equals)) {
             ProjectUtil.returnErrorMsg(Constants.ONLY_EXCEL_FILES_ALLOWED, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
             return response;
         }
@@ -473,14 +468,16 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             return response;
         }
 
-        ArrayNode customFieldsListData = parseHierarchy(headers, dataRows, levels);
+        // Use the new method to get both hierarchies
+        Map<String, ArrayNode> hierarchies = parseHierarchyWithReversed(headers, dataRows, levels);
 
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
         String formattedCurrentTime = getFormattedCurrentTime(currentTime);
         customFieldsData.put(Constants.CREATED_BY, userId);
         customFieldsData.put(Constants.CREATED_ON, formattedCurrentTime);
         customFieldsData.put(Constants.UPDATED_ON, formattedCurrentTime);
-        customFieldsData.put(Constants.CUSTOM_FIELD_DATA, customFieldsListData);
+        customFieldsData.put(Constants.CUSTOM_FIELD_DATA, hierarchies.get(Constants.CUSTOM_FIELD_DATA));
+        customFieldsData.put(Constants.REVERSED_ORDER_CUSTOM_FIELD_DATA, hierarchies.get(Constants.REVERSED_ORDER_CUSTOM_FIELD_DATA));
         customFieldsData.put(Constants.IS_ACTIVE, true);
 
         JsonNode jsonNode = objectMapper.valueToTree(customFieldsData);
@@ -506,45 +503,374 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
         return response;
     }
 
-    private ArrayNode parseHierarchy(String[] headers, List<Row> dataRows, int levels) {
+    private Map<String, ArrayNode> parseHierarchyWithReversed(String[] headers, List<Row> dataRows, int levels) {
         ArrayNode root = objectMapper.createArrayNode();
+        // List of maps for each level to track existing nodes
+        List<Map<String, ObjectNode>> levelMaps = new ArrayList<>();
+        for (int i = 0; i < levels; i++) {
+            levelMaps.add(new HashMap<>());
+        }
+
         for (Row row : dataRows) {
             ArrayNode currentArray = root;
+            ObjectNode parentNode = null;
             String parentFieldName = null;
             String parentFieldValue = null;
+
             for (int j = 0; j < levels; j++) {
                 Cell valueCell = row.getCell(j);
                 String value = (valueCell != null) ? valueCell.toString().trim() : null;
                 if (value == null || value.isEmpty()) break;
                 String fieldName = headers[j];
+                String key = fieldName + ":" + value + (parentFieldName != null ? "|" + parentFieldName + ":" + parentFieldValue : "");
 
-                ObjectNode foundNode = null;
-                for (JsonNode node : currentArray) {
-                    if (node.get("fieldName").asText().equals(fieldName) &&
-                            node.get("fieldValue").asText().equals(value)) {
-                        foundNode = (ObjectNode) node;
-                        break;
-                    }
-                }
+                Map<String, ObjectNode> currentLevelMap = levelMaps.get(j);
+                ObjectNode foundNode = currentLevelMap.get(key);
+
                 if (foundNode == null) {
                     ObjectNode newNode = objectMapper.createObjectNode();
-                    newNode.put("fieldName", fieldName);
-                    newNode.put("fieldValue", value);
-                    newNode.put("fieldAttribute", fieldName);
+                    newNode.put(Constants.FIELD_NAME, fieldName);
+                    newNode.put(Constants.FIELD_VALUE, value);
+                    newNode.put(Constants.FIELD_ATTRIBUTE, fieldName);
                     if (parentFieldName != null && parentFieldValue != null) {
-                        newNode.put("parentFieldName", parentFieldName);
-                        newNode.put("parentFieldValue", parentFieldValue);
+                        newNode.put(Constants.PARENT_FIELD_NAME, parentFieldName);
+                        newNode.put(Constants.PARENT_FIELD_VALUE, parentFieldValue);
                     }
                     ArrayNode childArray = objectMapper.createArrayNode();
-                    newNode.set("fieldValues", childArray);
+                    newNode.set(Constants.FIELD_VALUES, childArray);
                     currentArray.add(newNode);
+                    currentLevelMap.put(key, newNode);
                     foundNode = newNode;
                 }
                 parentFieldName = fieldName;
                 parentFieldValue = value;
-                currentArray = (ArrayNode) foundNode.get("fieldValues");
+                parentNode = foundNode;
+                currentArray = (ArrayNode) foundNode.get(Constants.FIELD_VALUES);
             }
         }
-        return root;
+
+        // Helper for reversed hierarchy
+        List<ObjectNode> reversedList = new ArrayList<>();
+        buildReversedHierarchyList(root, new ArrayList<>(), reversedList);
+
+        ArrayNode reversedOrderCustomFieldData = objectMapper.valueToTree(reversedList);
+
+        Map<String, ArrayNode> result = new HashMap<>();
+        result.put(Constants.CUSTOM_FIELD_DATA, root);
+        result.put(Constants.REVERSED_ORDER_CUSTOM_FIELD_DATA, reversedOrderCustomFieldData);
+        return result;
+    }
+
+    private void buildReversedHierarchyList(JsonNode node, List<ObjectNode> path, List<ObjectNode> reversedList) {
+        // Handle array nodes - process each child separately
+        if (node.isArray()) {
+            for (JsonNode child : node) {
+                buildReversedHierarchyList(child, new ArrayList<>(), reversedList);
+            }
+            return;
+        }
+
+        // Add current node to the path
+        path.add((ObjectNode) node);
+
+        // Get children if any
+        ArrayNode children = (ArrayNode) node.get(Constants.FIELD_VALUES);
+
+        if (children == null || children.isEmpty()) {
+            // This is a leaf node - create the reversed hierarchy
+            ObjectNode reversedNode = null;
+
+            // Start from leaf (last in path) and work up to root
+            for (int i = 0; i < path.size(); i++) {
+                ObjectNode current = objectMapper.createObjectNode();
+                final ObjectNode nodeAtI = path.get(i);
+
+                // Copy all fields except fieldValues
+                nodeAtI.fieldNames().forEachRemaining(field -> {
+                    if (!Constants.FIELD_VALUES.equals(field)) {
+                        current.set(field, nodeAtI.get(field));
+                    }
+                });
+
+                if (reversedNode == null) {
+                    // First node (leaf) gets empty fieldValues
+                    current.set(Constants.FIELD_VALUES, objectMapper.createArrayNode());
+                    reversedNode = current;
+                } else {
+                    // Parent nodes get the previous node as child
+                    ArrayNode arr = objectMapper.createArrayNode();
+                    arr.add(reversedNode);
+                    current.set(Constants.FIELD_VALUES, arr);
+                    reversedNode = current;
+                }
+            }
+
+            // Add the reversed hierarchy to the result list
+            reversedList.add(reversedNode);
+        } else {
+            // For non-leaf nodes, process each child
+            for (JsonNode child : children) {
+                // Use a copy of the path for each child branch
+                buildReversedHierarchyList(child, new ArrayList<>(path), reversedList);
+            }
+        }
+    }
+
+    @Override
+    public ApiResponse updateMasterListCustomField(MultipartFile file, String customFieldsMasterDataJson, String token) {
+        ApiResponse response = ProjectUtil.createDefaultResponse("customFields.update.masterList");
+        log.info("CustomFieldsServiceImpl::updateMasterListCustomField: Updating master list custom field");
+        try {
+            Map<String, Object> customFieldsData;
+            JsonNode payloadNode;
+            try {
+                customFieldsData = objectMapper.readValue(customFieldsMasterDataJson, Map.class);
+                payloadNode = objectMapper.valueToTree(customFieldsData);
+            } catch (Exception e) {
+                ProjectUtil.returnErrorMsg(Constants.INVALID_JSON_CUSTOM_FIELDS_MASTER_DATA + e.getMessage(), HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
+            // Validate payload - this will check for required customFieldId
+            payloadValidation.validatePayload(cbServerProperties.getCustomFieldListUpdateValidationFilePath(), payloadNode);
+
+            String userId = accessTokenValidator.fetchUserIdFromAccessToken(token);
+            if (StringUtils.isBlank(userId)) {
+                ProjectUtil.returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
+                return response;
+            }
+
+            // Check if custom field exists
+            Optional<CustomFieldEntity> customFieldOpt = customFieldRepository.findByCustomFiledIdAndIsActiveTrue(
+                    payloadNode.get(Constants.CUSTOM_FIELD_ID).asText()
+            );
+            if (customFieldOpt.isEmpty()) {
+                ProjectUtil.returnErrorMsg("Custom field not found with ID: " + payloadNode.get(Constants.CUSTOM_FIELD_ID).asText(), HttpStatus.NOT_FOUND, response, Constants.FAILED);
+                return response;
+            }
+
+            CustomFieldEntity existingCustomField = customFieldOpt.get();
+            JsonNode existingData = existingCustomField.getCustomFieldData();
+
+            if (file == null || file.isEmpty()) {
+                ProjectUtil.returnErrorMsg(Constants.UPLOADED_FILE_IS_EMPTY, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
+            String fileName = file.getOriginalFilename();
+            String contentType = file.getContentType();
+            List<String> extensions = Arrays.asList(cbServerProperties.getAllowedExtensions().split(","));
+            List<String> contentTypes = Arrays.asList(cbServerProperties.getAllowedContentTypes().split(","));
+
+            if (fileName == null ||
+                    extensions.stream().noneMatch(fileName::endsWith) ||
+                    contentType == null ||
+                    contentTypes.stream().noneMatch(contentType::equals)) {
+                ProjectUtil.returnErrorMsg(Constants.ONLY_EXCEL_FILES_ALLOWED, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
+            Object customFieldDataObj = customFieldsData.get(Constants.CUSTOM_FIELD_DATA);
+            if (!(customFieldDataObj instanceof List<?> customFieldDataList) || customFieldDataList.isEmpty()) {
+                ProjectUtil.returnErrorMsg(Constants.CUSTOM_FIELD_DATA_NON_EMPTY, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
+            int maxLevel = cbServerProperties.getCustomFieldMaxLevel();
+            if (customFieldDataList.size() > maxLevel) {
+                ProjectUtil.returnErrorMsg(String.format(Constants.CUSTOM_FIELD_DATA_LEVELS_EXCEED, maxLevel), HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
+            String[] headers;
+            int levels;
+            List<Row> dataRows = new ArrayList<>();
+
+            try (InputStream is = file.getInputStream(); Workbook workbook = new XSSFWorkbook(is)) {
+                Sheet sheet = workbook.getSheetAt(0);
+                Row headerRow = sheet.getRow(0);
+                if (headerRow == null) {
+                    ProjectUtil.returnErrorMsg(Constants.EXCEL_HEADER_ROW_REQUIRED, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                    return response;
+                }
+
+                int excelColumns = headerRow.getLastCellNum();
+                int jsonLevels = customFieldDataList.size();
+
+                if (excelColumns > jsonLevels) {
+                    ProjectUtil.returnErrorMsg(
+                            String.format(Constants.EXCEL_MORE_COLUMNS_THAN_LEVELS, excelColumns, jsonLevels),
+                            HttpStatus.BAD_REQUEST, response, Constants.FAILED
+                    );
+                    return response;
+                }
+
+                if (excelColumns > maxLevel) {
+                    ProjectUtil.returnErrorMsg(String.format(Constants.EXCEL_MORE_THAN_MAX_LEVELS, maxLevel), HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                    return response;
+                }
+
+                levels = jsonLevels;
+
+                headers = new String[levels];
+                for (int j = 0; j < levels; j++) {
+                    headers[j] = headerRow.getCell(j).getStringCellValue();
+                }
+                for (int i = 0; i < levels; i++) {
+                    Cell headerCell = headerRow.getCell(i);
+                    if (headerCell == null) continue;
+                    String header = headerCell.getStringCellValue().trim();
+                    Map<?, ?> fieldMeta = (Map<?, ?>) customFieldDataList.get(i);
+
+                    String expectedAttribute = String.valueOf(fieldMeta.get(Constants.ATTRIBUTE_NAME));
+                    int expectedLevel = Integer.parseInt(String.valueOf(fieldMeta.get(Constants.LEVEL)));
+                    if (!header.equalsIgnoreCase(expectedAttribute)) {
+                        ProjectUtil.returnErrorMsg(String.format(Constants.HEADER_MISMATCH, header, expectedAttribute, (i + 1)), HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                        return response;
+                    }
+                    if (expectedLevel != (i + 1)) {
+                        ProjectUtil.returnErrorMsg(String.format(Constants.LEVEL_MISMATCH, (i + 1), expectedLevel, (i + 1)), HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                        return response;
+                    }
+                }
+
+                for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+                    Row row = sheet.getRow(i);
+                    if (row != null) dataRows.add(row);
+                }
+            } catch (Exception e) {
+                ProjectUtil.returnErrorMsg(String.format(Constants.ERROR_READING_EXCEL, e.getMessage()), HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
+            // Use the method to get both hierarchies
+            Map<String, ArrayNode> hierarchies = parseHierarchyWithReversed(headers, dataRows, levels);
+
+            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+            String formattedCurrentTime = getFormattedCurrentTime(currentTime);
+
+            // Preserve original creation info and other fields
+            ObjectNode existingDataNode = (ObjectNode) existingData;
+            if (existingDataNode.has(Constants.CREATED_BY)) {
+                customFieldsData.put(Constants.CREATED_BY, existingDataNode.get(Constants.CREATED_BY).asText());
+            }
+            if (existingDataNode.has(Constants.CREATED_ON)) {
+                customFieldsData.put(Constants.CREATED_ON, existingDataNode.get(Constants.CREATED_ON).asText());
+            }
+
+            customFieldsData.put(Constants.UPDATED_BY, userId);
+            customFieldsData.put(Constants.UPDATED_ON, formattedCurrentTime);
+            customFieldsData.put(Constants.CUSTOM_FIELD_DATA, hierarchies.get(Constants.CUSTOM_FIELD_DATA));
+            customFieldsData.put(Constants.REVERSED_ORDER_CUSTOM_FIELD_DATA, hierarchies.get(Constants.REVERSED_ORDER_CUSTOM_FIELD_DATA));
+            customFieldsData.put(Constants.IS_ACTIVE, true);
+
+            // Preserve other important fields if present in existing data
+            if (existingDataNode.has(Constants.IS_MANDATORY)) {
+                customFieldsData.put(Constants.IS_MANDATORY, existingDataNode.get(Constants.IS_MANDATORY).asBoolean());
+            }
+            if (existingDataNode.has(Constants.IS_ENABLED)) {
+                customFieldsData.put(Constants.IS_ENABLED, existingDataNode.get(Constants.IS_ENABLED).asBoolean());
+            }
+
+            JsonNode jsonNode = objectMapper.valueToTree(customFieldsData);
+            existingCustomField.setCustomFieldData(jsonNode);
+            existingCustomField.setUpdatedOn(currentTime);
+
+            customFieldRepository.save(existingCustomField);
+
+            Map<String, Object> customFieldMap = objectMapper.convertValue(customFieldsData, Map.class);
+            customFieldMap.put(Constants.CUSTOM_FIELD_ID, payloadNode.get(Constants.CUSTOM_FIELD_ID).asText());
+
+            // Update ES document
+            esUtilService.updateDocument(
+                    cbServerProperties.getCustomFieldEntity(),
+                    payloadNode.get(Constants.CUSTOM_FIELD_ID).asText(),
+                    customFieldMap,
+                    cbServerProperties.getCustomFieldElasticMappingJsonPath()
+            );
+
+            // Update Redis cache
+            cacheService.putCache(Constants.CUSTOM_FIELD + payloadNode.get(Constants.CUSTOM_FIELD_ID).asText(), objectMapper.valueToTree(customFieldMap));
+
+            response.setResponseCode(HttpStatus.OK);
+            response.getParams().setStatus(Constants.SUCCESS);
+            response.setMessage(Constants.SUCCESS);
+            response.setResult(customFieldMap);
+            return response;
+        }catch (Exception e) {
+            log.error("Exception in updateMasterListCustomField: {}", e.getMessage(), e);
+            ProjectUtil.returnErrorMsg("Failed to update master list custom field: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
+            return response;
+        }
+    }
+
+    @Override
+    public ApiResponse updateCustomFieldStatus(JsonNode updateCustomFieldStatusData, String token) {
+        ApiResponse response = ProjectUtil.createDefaultResponse("customField.updateStatus");
+        payloadValidation.validatePayload(cbServerProperties.getCustomFieldStatusUpdateValidationFilePath(), updateCustomFieldStatusData);
+        try {
+            String userId = accessTokenValidator.fetchUserIdFromAccessToken(token);
+            if (StringUtils.isBlank(userId)) {
+                ProjectUtil.returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
+                return response;
+            }
+
+            String customFieldId = updateCustomFieldStatusData.get(Constants.CUSTOM_FIELD_ID).asText();
+            boolean isEnabled = updateCustomFieldStatusData.get(Constants.IS_ENABLED).asBoolean();
+            if (StringUtils.isBlank(customFieldId)) {
+                ProjectUtil.returnErrorMsg("CustomFieldId is required", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
+            Optional<CustomFieldEntity> customFieldOpt = customFieldRepository.findByCustomFiledIdAndIsActiveTrue(customFieldId);
+            if (customFieldOpt.isEmpty()) {
+                ProjectUtil.returnErrorMsg("Custom field not found with ID: " + customFieldId, HttpStatus.NOT_FOUND, response, Constants.FAILED);
+                return response;
+            }
+
+            CustomFieldEntity customField = customFieldOpt.get();
+            JsonNode customFieldData = customField.getCustomFieldData();
+            boolean currentStatus = customFieldData.has(Constants.IS_ENABLED) &&
+                    customFieldData.get(Constants.IS_ENABLED).asBoolean();
+
+            if (isEnabled && currentStatus) {
+                ProjectUtil.returnErrorMsg("isEnabled is already true for this custom field", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
+            ObjectNode customFieldDataNode = (ObjectNode) customFieldData;
+            customFieldDataNode.put(Constants.IS_ENABLED, isEnabled);
+            customFieldDataNode.put(Constants.UPDATED_BY, userId);
+
+            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+            String formattedCurrentTime = getFormattedCurrentTime(currentTime);
+            customFieldDataNode.put(Constants.UPDATED_ON, formattedCurrentTime);
+
+            customField.setCustomFieldData(customFieldDataNode);
+            customField.setUpdatedOn(currentTime);
+            customFieldRepository.save(customField);
+
+            Map<String, Object> customFieldMap = objectMapper.convertValue(customFieldDataNode, Map.class);
+            customFieldMap.put(Constants.CUSTOM_FIELD_ID, customFieldId);
+
+            esUtilService.updateDocument(
+                    cbServerProperties.getCustomFieldEntity(),
+                    customFieldId,
+                    customFieldMap,
+                    cbServerProperties.getCustomFieldElasticMappingJsonPath()
+            );
+
+            cacheService.putCache(Constants.CUSTOM_FIELD + customFieldId, objectMapper.valueToTree(customFieldMap));
+
+            response.setResponseCode(HttpStatus.OK);
+            response.getParams().setStatus(Constants.SUCCESS);
+            response.setMessage(Constants.SUCCESS);
+            response.setResult(customFieldMap);
+            return response;
+        } catch (Exception e) {
+            log.error("Failed to update custom field status: {}", e.getMessage(), e);
+            ProjectUtil.returnErrorMsg("Failed to update custom field status: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
+            return response;
+        }
     }
 }
