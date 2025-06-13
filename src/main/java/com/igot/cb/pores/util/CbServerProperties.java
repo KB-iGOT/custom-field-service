@@ -28,4 +28,16 @@ public class CbServerProperties {
   @Value("${customField.list.validation.file.path}")
   private String customFieldListValidationFilePath;
 
+  @Value("${customField.upload.allowedExtensions}")
+  private String allowedExtensions;
+
+  @Value("${customField.upload.allowedContentTypes}")
+  private String allowedContentTypes;
+
+  @Value("${customField.list.update.validation.file.path}")
+  private String customFieldListUpdateValidationFilePath;
+
+  @Value("${customField.status.update.validation.file.path}")
+  private String customFieldStatusUpdateValidationFilePath;
+
 }

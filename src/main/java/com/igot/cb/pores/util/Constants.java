@@ -90,9 +90,18 @@ public class Constants {
     public static final String CUSTOM_FIELD = "CUSTOM_FIELD_";
     public static final String ATTRIBUTE_NAME = "attributeName";
     public static final String LEVEL = "level";
-    public static final String XLSX = ".xlsx";
-    public static final String XLS = ".xls";
     public static final String INVALID_JSON_CUSTOM_FIELDS_MASTER_DATA = "Invalid JSON for customFieldsMasterData: ";
+    public static final String FIELD_NAME = "fieldName";
+    public static final String FIELD_VALUE = "fieldValue";
+    public static final String FIELD_ATTRIBUTE = "fieldAttribute";
+    public static final String PARENT_FIELD_NAME = "parentFieldName";
+    public static final String PARENT_FIELD_VALUE = "parentFieldValue";
+    public static final String FIELD_VALUES = "fieldValues";
+    public static final String SEARCH_RESULTS = "searchResults";
+    public static final String CUSTOM_FIELD_ID_PARAM = "customFieldId";
+    public static final String STATUS = "status";
+    public static final String DELETED = "deleted";
+    public static final String REVERSED_ORDER_CUSTOM_FIELD_DATA = "reversedOrderCustomFieldData";
 
     private Constants() {
     }
