@@ -69,7 +69,7 @@ public class CustomFieldsController {
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
-    @PutMapping(value = "/masterList/update")
+    @PostMapping(value = "/masterList/update")
     public ResponseEntity<ApiResponse> updateMasterListCustomField(
             @RequestParam("file") MultipartFile file,
             @RequestParam("metadata") String customFieldsMasterDataJson,
