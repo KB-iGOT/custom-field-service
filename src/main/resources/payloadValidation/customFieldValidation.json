@@ -26,6 +26,9 @@
     },
     "isEnabled": {
       "type": "boolean"
+    },
+    "attributeMaxLength": {
+      "type": "number"
     }
   },
   "required": [
