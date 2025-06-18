@@ -52,6 +52,9 @@
   "isEnabled": {
     "type": "boolean"
   },
+  "attributeMaxLength": {
+    "type": "integer"
+  },
   "validation": {
     "type": "keyword"
   },
