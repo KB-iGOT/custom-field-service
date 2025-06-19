@@ -102,6 +102,16 @@ public class Constants {
     public static final String STATUS = "status";
     public static final String DELETED = "deleted";
     public static final String REVERSED_ORDER_CUSTOM_FIELD_DATA = "reversedOrderCustomFieldData";
+    public static final String ORGANIZATION_ID = "organisationId";
+    public static final String REQUEST = "request";
+    public static final String KEYSPACE_SUNBIRD = "sunbird";
+    public static final String ORG_TABLE = "organisation";
+    public static final String CUSTOM_FIELDS_DATA = "customfieldsdata";
+    public static final String LEVELS = "levels";
+    public static final String ORIGINAL_CUSTOM_FIELD_DATA = "originalCustomFieldData";
+    public static final String CUSTOM_FIELD_IDS = "customFieldIds";
+    public static final String CUSTOM_FIELDS_COUNT = "customFieldsCount";
+    public static final String MASTER_LIST = "masterList";
 
     private Constants() {
     }
