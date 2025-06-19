@@ -14,6 +14,7 @@ import com.igot.cb.pores.elasticsearch.service.EsUtilService;
 import com.igot.cb.pores.util.*;
 import com.igot.cb.transactional.cassandrautils.CassandraOperationImpl;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -872,7 +873,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
 
                 Map<String, Object> customFieldsData;
 
-                if (orgList.isEmpty() || StringUtils.isBlank((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA))) {
+                if (CollectionUtils.isEmpty(orgList) || StringUtils.isBlank((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA))) {
                     customFieldsData = new HashMap<>();
                     List<String> customFieldIds = new ArrayList<>();
                     customFieldIds.add(fieldIdFromData);
@@ -889,8 +890,6 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                     if (!customFieldsData.containsKey(Constants.CUSTOM_FIELDS_COUNT)) {
                         customFieldsData.put(Constants.CUSTOM_FIELDS_COUNT, 0);
                     }
-
-                    List<String> customFieldIds = (List<String>) customFieldsData.get(Constants.CUSTOM_FIELD_IDS);
                     int currentCount = ((Number) customFieldsData.get(Constants.CUSTOM_FIELDS_COUNT)).intValue();
 
                     // Check if enabling this field would exceed the limit
@@ -901,8 +900,9 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                         return response;
                     }
 
+                    List<String> customFieldIds = (List<String>) customFieldsData.get(Constants.CUSTOM_FIELD_IDS);
                     // Add the field ID and update the count
-                    if (!customFieldIds.contains(fieldIdFromData)) {
+                    if (CollectionUtils.isEmpty(customFieldIds) || !customFieldIds.contains(fieldIdFromData)) {
                         customFieldIds.add(fieldIdFromData);
                         customFieldsData.put(Constants.CUSTOM_FIELD_IDS, customFieldIds);
                         customFieldsData.put(Constants.CUSTOM_FIELDS_COUNT, currentCount + fieldCount);
@@ -913,6 +913,43 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                 orgUpdateData.put(Constants.ID, customFieldData.get(Constants.ORGANIZATION_ID).asText());
                 orgUpdateData.put(Constants.CUSTOM_FIELDS_DATA, objectMapper.writeValueAsString(customFieldsData));
                 cassandraOperation.updateRecord(Constants.KEYSPACE_SUNBIRD, Constants.ORG_TABLE, orgUpdateData);
+            } else {
+                Map<String, Object> propertyMap = new HashMap<>();
+                propertyMap.put(Constants.ID, customFieldData.get(Constants.ORGANIZATION_ID).asText());
+                List<Map<String, Object>> orgList = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                        Constants.KEYSPACE_SUNBIRD, Constants.ORG_TABLE, propertyMap, Arrays.asList(Constants.CUSTOM_FIELDS_DATA), null);
+
+                if (!CollectionUtils.isEmpty(orgList) && !StringUtils.isBlank((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA))) {
+
+                    Map<String, Object> customFieldsData = objectMapper.readValue((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA), Map.class);
+
+                    // Only proceed if customFieldsData has the expected structure
+                    if (customFieldsData.containsKey(Constants.CUSTOM_FIELD_IDS) && customFieldsData.containsKey(Constants.CUSTOM_FIELDS_COUNT)) {
+                        List<String> customFieldIds = (List<String>) customFieldsData.get(Constants.CUSTOM_FIELD_IDS);
+
+                        // Remove the field ID if it exists
+                        if (!CollectionUtils.isEmpty(customFieldIds) && customFieldIds.contains(customFieldId)) {
+                            customFieldIds.remove(customFieldId);
+                            customFieldsData.put(Constants.CUSTOM_FIELD_IDS, customFieldIds);
+
+                            // Calculate field count using same logic as the enable case
+                            int fieldCount = 1;
+                            if (customFieldData.has(Constants.TYPE) && Constants.MASTER_LIST.equals(customFieldData.get(Constants.TYPE).asText())) {
+                                fieldCount = customFieldData.get(Constants.LEVELS).asInt();
+                            }
+
+                            // Reduce the fields count
+                            int currentCount = ((Number) customFieldsData.get(Constants.CUSTOM_FIELDS_COUNT)).intValue();
+                            customFieldsData.put(Constants.CUSTOM_FIELDS_COUNT, Math.max(0, currentCount - fieldCount));
+
+                            // Update the organization record
+                            Map<String, Object> orgUpdateData = new HashMap<>();
+                            orgUpdateData.put(Constants.ID, customFieldData.get(Constants.ORGANIZATION_ID).asText());
+                            orgUpdateData.put(Constants.CUSTOM_FIELDS_DATA, objectMapper.writeValueAsString(customFieldsData));
+                            cassandraOperation.updateRecord(Constants.KEYSPACE_SUNBIRD, Constants.ORG_TABLE, orgUpdateData);
+                        }
+                    }
+                }
             }
 
             ObjectNode customFieldDataNode = (ObjectNode) customFieldData;
