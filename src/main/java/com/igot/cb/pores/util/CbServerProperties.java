@@ -40,4 +40,7 @@ public class CbServerProperties {
   @Value("${customField.status.update.validation.file.path}")
   private String customFieldStatusUpdateValidationFilePath;
 
+  @Value("${custom.field.max.allowed.count}")
+  private int customFieldMaxAllowedCount;
+
 }

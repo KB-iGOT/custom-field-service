@@ -58,7 +58,13 @@
   "validation": {
     "type": "keyword"
   },
+  "originalCustomFieldData": {
+    "type": "nested"
+  },
   "reversedOrderCustomFieldData": {
     "type": "nested"
+  },
+  "levels": {
+    "type": "integer"
   }
 }
