@@ -112,6 +112,10 @@ public class Constants {
     public static final String CUSTOM_FIELD_IDS = "customFieldIds";
     public static final String CUSTOM_FIELDS_COUNT = "customFieldsCount";
     public static final String MASTER_LIST = "masterList";
+    public static final String IS_POPUP_ENABLED = "isPopupEnabled";
+    public static final String POPUP_STATUS = "popupStatus";
+    public static final String ENABLED = "enabled";
+    public static final String DISABLED = "disabled";
 
     private Constants() {
     }

@@ -275,13 +275,24 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                 return response;
             }
 
-            // Soft delete by updating isActive flag
+            // Get the custom field entity
             CustomFieldEntity customField = customFieldOpt.get();
+            JsonNode customFieldData = customField.getCustomFieldData();
+
+            // Check if the field is enabled - cannot delete enabled fields
+            boolean isEnabled = customFieldData.has(Constants.IS_ENABLED) &&
+                    customFieldData.get(Constants.IS_ENABLED).asBoolean();
+            if (isEnabled) {
+                ProjectUtil.returnErrorMsg("Cannot delete an enabled custom field. Please disable it first.",
+                        HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
+            // Proceed with soft delete
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
             String formattedCurrentTime = getFormattedCurrentTime(currentTime);
 
             // Update the JSON data to reflect the deletion
-            JsonNode customFieldData = customField.getCustomFieldData();
             ObjectNode customFieldDataNode = (ObjectNode) customFieldData;
             customFieldDataNode.put(Constants.IS_ACTIVE, false);
             customFieldDataNode.put(Constants.UPDATED_BY, userId);
@@ -985,5 +996,104 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             ProjectUtil.returnErrorMsg("Failed to update custom field status: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
             return response;
         }
+    }
+
+    @Override
+    public ApiResponse updatePopupStatus(Map<String, Object> popupStatusData, String token) {
+        ApiResponse response = ProjectUtil.createDefaultResponse("customField.updatePopupStatus");
+
+        try {
+            String userId = accessTokenValidator.fetchUserIdFromAccessToken(token);
+            if (StringUtils.isBlank(userId)) {
+                ProjectUtil.returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
+                return response;
+            }
+
+            String error = validatePopupStatusData(popupStatusData);
+            if (StringUtils.isNotBlank(error)) {
+                ProjectUtil.returnErrorMsg(error, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
+            String organizationId = (String) popupStatusData.get(Constants.ORGANIZATION_ID);
+            boolean isEnabled = Boolean.TRUE.equals(popupStatusData.get(Constants.IS_POPUP_ENABLED));
+
+            Map<String, Object> propertyMap = new HashMap<>();
+            propertyMap.put(Constants.ID, organizationId);
+            List<Map<String, Object>> orgList = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                    Constants.KEYSPACE_SUNBIRD, Constants.ORG_TABLE, propertyMap, Arrays.asList(Constants.CUSTOM_FIELDS_DATA), null);
+
+            if (orgList.isEmpty()) {
+                ProjectUtil.returnErrorMsg("Organization not found with ID: " + organizationId, HttpStatus.NOT_FOUND, response, Constants.FAILED);
+                return response;
+            }
+
+            Map<String, Object> customFieldsData;
+
+            if (StringUtils.isBlank((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA))) {
+                customFieldsData = new HashMap<>();
+            } else {
+                customFieldsData = objectMapper.readValue((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA), Map.class);
+            }
+
+            if (MapUtils.isEmpty(customFieldsData)) {
+                ProjectUtil.returnErrorMsg("No Active Custom Fields found for Organization ID: " + organizationId, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
+            if (customFieldsData.containsKey(Constants.IS_POPUP_ENABLED)) {
+                boolean currentStatus = Boolean.TRUE.equals(customFieldsData.get(Constants.IS_POPUP_ENABLED));
+                if (currentStatus == isEnabled) {
+                    String status = isEnabled ? Constants.ENABLED : Constants.DISABLED;
+                    ProjectUtil.returnErrorMsg("Popup is already " + status + " for this organization",
+                            HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                    return response;
+                }
+            }
+
+            customFieldsData.put(Constants.IS_POPUP_ENABLED, isEnabled);
+
+            Map<String, Object> orgUpdateData = new HashMap<>();
+            orgUpdateData.put(Constants.ID, organizationId);
+            orgUpdateData.put(Constants.CUSTOM_FIELDS_DATA, objectMapper.writeValueAsString(customFieldsData));
+            cassandraOperation.updateRecord(Constants.KEYSPACE_SUNBIRD, Constants.ORG_TABLE, orgUpdateData);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put(Constants.ORGANISATION_ID, organizationId);
+            result.put(Constants.POPUP_STATUS, isEnabled ? Constants.ENABLED : Constants.DISABLED);
+
+            response.setResponseCode(HttpStatus.OK);
+            response.getParams().setStatus(Constants.SUCCESS);
+            response.setMessage(Constants.SUCCESS);
+            response.setResult(result);
+        } catch (Exception e) {
+            log.error("Failed to update popup status: {}", e.getMessage(), e);
+            ProjectUtil.returnErrorMsg("Failed to update popup status: " + e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
+        }
+        return response;
+    }
+
+    private String validatePopupStatusData(Map<String, Object> popupStatusData) {
+        StringBuffer str = new StringBuffer();
+        List<String> errList = new ArrayList<>();
+
+        if (MapUtils.isEmpty(popupStatusData)) {
+            str.append("Popup status data object is empty.");
+            return str.toString();
+        }
+
+        if (StringUtils.isEmpty((String) popupStatusData.get(Constants.ORGANIZATION_ID))) {
+            errList.add(Constants.ORGANIZATION_ID);
+        }
+
+        if (!popupStatusData.containsKey(Constants.IS_POPUP_ENABLED)) {
+            errList.add(Constants.IS_POPUP_ENABLED);
+        }
+
+        if (!errList.isEmpty()) {
+            str.append("Failed due to missing params - ").append(errList).append(".");
+        }
+        return str.toString();
     }
 }

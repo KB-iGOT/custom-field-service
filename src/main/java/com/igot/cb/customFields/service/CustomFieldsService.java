@@ -6,6 +6,8 @@ import com.igot.cb.pores.util.ApiResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Map;
+
 @Service
 public interface CustomFieldsService {
 
@@ -24,4 +26,6 @@ public interface CustomFieldsService {
     ApiResponse updateMasterListCustomField(MultipartFile file, String customFieldsMasterDataJson, String token);
 
     ApiResponse updateCustomFieldStatus(JsonNode updateCustomFieldStatusData, String token);
+
+    ApiResponse updatePopupStatus(Map<String, Object> popupStatusData, String token);
 }
