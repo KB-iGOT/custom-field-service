@@ -85,4 +85,12 @@ public class CustomFieldsController {
         ApiResponse response = customFieldsService.updateCustomFieldStatus(updateCustomFieldStatusData, token);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
+
+    @PostMapping("/popup/update")
+    public ResponseEntity<ApiResponse> updatePopupStatus(
+            @RequestBody Map<String, Object> popupStatusData,
+            @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
+        ApiResponse response = customFieldsService.updatePopupStatus(popupStatusData, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
 }
