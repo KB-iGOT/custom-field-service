@@ -261,53 +261,53 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
         ApiResponse response = new ApiResponse("customField.delete");
 
         try {
-            // Validate user token
             String userId = accessTokenValidator.fetchUserIdFromAccessToken(token);
             if (StringUtils.isBlank(userId)) {
                 ProjectUtil.returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
                 return response;
             }
 
-            // Check if field exists
             Optional<CustomFieldEntity> customFieldOpt = customFieldRepository.findByCustomFiledIdAndIsActiveTrue(customFieldId);
             if (customFieldOpt.isEmpty()) {
                 ProjectUtil.returnErrorMsg("Custom field not found with ID: " + customFieldId, HttpStatus.NOT_FOUND, response, Constants.FAILED);
                 return response;
             }
 
-            // Get the custom field entity
             CustomFieldEntity customField = customFieldOpt.get();
             JsonNode customFieldData = customField.getCustomFieldData();
+            boolean isEnabled = customFieldData.has(Constants.IS_ENABLED) && customFieldData.get(Constants.IS_ENABLED).asBoolean();
 
-            // Check if the field is enabled - cannot delete enabled fields
-            boolean isEnabled = customFieldData.has(Constants.IS_ENABLED) &&
-                    customFieldData.get(Constants.IS_ENABLED).asBoolean();
+            // If enabled, first disable it by removing from org
             if (isEnabled) {
-                ProjectUtil.returnErrorMsg("Cannot delete an enabled custom field. Please disable it first.",
-                        HttpStatus.BAD_REQUEST, response, Constants.FAILED);
-                return response;
+                log.info("Custom field is enabled, removing from org table before deletion: {}", customFieldId);
+                try {
+                    removeCustomFieldFromOrg(customFieldId, customFieldData);
+                } catch (Exception e) {
+                    log.error("Failed to remove custom field from org: {}", e.getMessage(), e);
+                    ProjectUtil.returnErrorMsg("Failed to disable custom field before deletion: " + e.getMessage(),
+                            HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
+                    return response;
+                }
+                log.info("Successfully removed custom field from org table: {}", customFieldId);
             }
 
             // Proceed with soft delete
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
             String formattedCurrentTime = getFormattedCurrentTime(currentTime);
-
-            // Update the JSON data to reflect the deletion
             ObjectNode customFieldDataNode = (ObjectNode) customFieldData;
             customFieldDataNode.put(Constants.IS_ACTIVE, false);
+            customFieldDataNode.put(Constants.IS_ENABLED, false);
             customFieldDataNode.put(Constants.UPDATED_BY, userId);
             customFieldDataNode.put(Constants.UPDATED_ON, formattedCurrentTime);
 
-            // Update the entity
             customField.setCustomFieldData(customFieldDataNode);
             customField.setIsActive(false);
             customField.setUpdatedOn(currentTime);
             customFieldRepository.save(customField);
+            log.info("Custom field soft deleted, customFieldId: {}", customFieldId);
 
-            // Update ES document instead of deleting it
             Map<String, Object> customFieldMap = objectMapper.convertValue(customFieldDataNode, Map.class);
             customFieldMap.put(Constants.CUSTOM_FIELD_ID, customFieldId);
-
             esUtilService.updateDocument(
                     cbServerProperties.getCustomFieldEntity(),
                     customFieldId,
@@ -315,23 +315,20 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                     cbServerProperties.getCustomFieldElasticMappingJsonPath()
             );
 
-            // Remove from cache
             cacheService.deleteCache("CUSTOM_FIELD_" + customFieldId);
+            log.info("Cache and ES entries updated for deleted custom field: {}", customFieldId);
 
-            // Set success response
             response.setResponseCode(HttpStatus.OK);
             response.setMessage(Constants.SUCCESS);
             Map<String, Object> resultMap = new HashMap<>();
             resultMap.put(Constants.CUSTOM_FIELD_ID_PARAM, customFieldId);
             resultMap.put(Constants.STATUS, Constants.DELETED);
             response.setResult(resultMap);
-
         } catch (Exception e) {
             log.error("Failed to delete custom field: {}", e.getMessage(), e);
             ProjectUtil.returnErrorMsg("Failed to delete custom field: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
             return response;
         }
-
         return response;
     }
 
@@ -429,6 +426,14 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
         int levels;
         List<Row> dataRows = new ArrayList<>();
 
+        Map<String, String> nameToAttributeMap = new HashMap<>();
+        for (Object fieldMetaObj : customFieldDataList) {
+            Map<?, ?> fieldMeta = (Map<?, ?>) fieldMetaObj;
+            String name = String.valueOf(fieldMeta.get("name"));
+            String attributeName = String.valueOf(fieldMeta.get(Constants.ATTRIBUTE_NAME));
+            nameToAttributeMap.put(name, attributeName);
+        }
+
         try (InputStream is = file.getInputStream(); Workbook workbook = new XSSFWorkbook(is)) {
             Sheet sheet = workbook.getSheetAt(0);
             Row headerRow = sheet.getRow(0);
@@ -457,18 +462,20 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
 
             headers = new String[levels];
             for (int j = 0; j < levels; j++) {
-                headers[j] = headerRow.getCell(j).getStringCellValue();
+                String excelHeader = headerRow.getCell(j).getStringCellValue().trim();
+                String attributeName = nameToAttributeMap.get(excelHeader);
+                if (attributeName == null) {
+                    ProjectUtil.returnErrorMsg("Excel header '" + excelHeader + "' does not match any field name in the request.", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                    return response;
+                }
+                headers[j] = attributeName;
             }
             for (int i = 0; i < levels; i++) {
-                Cell headerCell = headerRow.getCell(i);
-                if (headerCell == null) continue;
-                String header = headerCell.getStringCellValue().trim();
                 Map<?, ?> fieldMeta = (Map<?, ?>) customFieldDataList.get(i);
-
                 String expectedAttribute = String.valueOf(fieldMeta.get(Constants.ATTRIBUTE_NAME));
                 int expectedLevel = Integer.parseInt(String.valueOf(fieldMeta.get(Constants.LEVEL)));
-                if (!header.equalsIgnoreCase(expectedAttribute)) {
-                    ProjectUtil.returnErrorMsg(String.format(Constants.HEADER_MISMATCH, header, expectedAttribute, (i + 1)), HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                if (!headers[i].equalsIgnoreCase(expectedAttribute)) {
+                    ProjectUtil.returnErrorMsg(String.format(Constants.HEADER_MISMATCH, headers[i], expectedAttribute, (i + 1)), HttpStatus.BAD_REQUEST, response, Constants.FAILED);
                     return response;
                 }
                 if (expectedLevel != (i + 1)) {
@@ -670,6 +677,8 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
 
             CustomFieldEntity existingCustomField = customFieldOpt.get();
             JsonNode existingData = existingCustomField.getCustomFieldData();
+            boolean isEnabled = existingData.has(Constants.IS_ENABLED) &&
+                    existingData.get(Constants.IS_ENABLED).asBoolean();
 
             if (file == null || file.isEmpty()) {
                 ProjectUtil.returnErrorMsg(Constants.UPLOADED_FILE_IS_EMPTY, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
@@ -709,6 +718,14 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             int levels;
             List<Row> dataRows = new ArrayList<>();
 
+            Map<String, String> nameToAttributeMap = new HashMap<>();
+            for (Object fieldMetaObj : customFieldDataList) {
+                Map<?, ?> fieldMeta = (Map<?, ?>) fieldMetaObj;
+                String name = String.valueOf(fieldMeta.get("name"));
+                String attributeName = String.valueOf(fieldMeta.get(Constants.ATTRIBUTE_NAME));
+                nameToAttributeMap.put(name, attributeName);
+            }
+
             try (InputStream is = file.getInputStream(); Workbook workbook = new XSSFWorkbook(is)) {
                 Sheet sheet = workbook.getSheetAt(0);
                 Row headerRow = sheet.getRow(0);
@@ -737,18 +754,21 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
 
                 headers = new String[levels];
                 for (int j = 0; j < levels; j++) {
-                    headers[j] = headerRow.getCell(j).getStringCellValue();
+                    String excelHeader = headerRow.getCell(j).getStringCellValue().trim();
+                    String attributeName = nameToAttributeMap.get(excelHeader);
+                    if (attributeName == null) {
+                        ProjectUtil.returnErrorMsg("Excel header '" + excelHeader + "' does not match any field name in the request.", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                        return response;
+                    }
+                    headers[j] = attributeName;
                 }
-                for (int i = 0; i < levels; i++) {
-                    Cell headerCell = headerRow.getCell(i);
-                    if (headerCell == null) continue;
-                    String header = headerCell.getStringCellValue().trim();
-                    Map<?, ?> fieldMeta = (Map<?, ?>) customFieldDataList.get(i);
 
+                for (int i = 0; i < levels; i++) {
+                    Map<?, ?> fieldMeta = (Map<?, ?>) customFieldDataList.get(i);
                     String expectedAttribute = String.valueOf(fieldMeta.get(Constants.ATTRIBUTE_NAME));
                     int expectedLevel = Integer.parseInt(String.valueOf(fieldMeta.get(Constants.LEVEL)));
-                    if (!header.equalsIgnoreCase(expectedAttribute)) {
-                        ProjectUtil.returnErrorMsg(String.format(Constants.HEADER_MISMATCH, header, expectedAttribute, (i + 1)), HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                    if (!headers[i].equalsIgnoreCase(expectedAttribute)) {
+                        ProjectUtil.returnErrorMsg(String.format(Constants.HEADER_MISMATCH, headers[i], expectedAttribute, (i + 1)), HttpStatus.BAD_REQUEST, response, Constants.FAILED);
                         return response;
                     }
                     if (expectedLevel != (i + 1)) {
@@ -768,6 +788,18 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
 
             // Use the method to get both hierarchies
             Map<String, ArrayNode> hierarchies = parseHierarchyWithReversed(headers, dataRows, levels);
+
+            if (isEnabled) {
+                try {
+                    removeCustomFieldFromOrg(existingCustomField.getCustomFiledId(), existingData);
+                    log.info("Removed custom field from org as part of master list update: {}", existingCustomField.getCustomFiledId());
+                } catch (Exception e) {
+                    log.error("Failed to remove custom field from org during update: {}", e.getMessage(), e);
+                    ProjectUtil.returnErrorMsg("Failed to remove custom field from organization: " + e.getMessage(),
+                            HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
+                    return response;
+                }
+            }
 
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
             String formattedCurrentTime = getFormattedCurrentTime(currentTime);
@@ -855,112 +887,19 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             boolean currentStatus = customFieldData.has(Constants.IS_ENABLED) &&
                     customFieldData.get(Constants.IS_ENABLED).asBoolean();
 
-            if (isEnabled && currentStatus) {
-                ProjectUtil.returnErrorMsg("isEnabled is already true for this custom field", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
-                return response;
-            }
-            if (!isEnabled && !currentStatus) {
-                ProjectUtil.returnErrorMsg("isEnabled is already false for this custom field", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            if (isEnabled == currentStatus) {
+                ProjectUtil.returnErrorMsg("isEnabled is already " + isEnabled + " for this custom field", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
                 return response;
             }
 
             if (isEnabled) {
-                Map<String, Object> propertyMap = new HashMap<>();
-                propertyMap.put(Constants.ID, customFieldData.get(Constants.ORGANIZATION_ID).asText());
-                List<Map<String, Object>> orgList = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
-                        Constants.KEYSPACE_SUNBIRD, Constants.ORG_TABLE, propertyMap, Arrays.asList(Constants.CUSTOM_FIELDS_DATA), null);
-
-                // Prepare data to store in organization
-                String fieldIdFromData = customFieldId; // Using the customFieldId directly as it's more reliable
-
-                // Calculate how many fields this custom field accounts for
-                int fieldCount = 1; // Default for text fields
-
-                // Check if it's a masterList type and get levels
-                if (customFieldData.has(Constants.TYPE) && Constants.MASTER_LIST.equals(customFieldData.get(Constants.TYPE).asText())) {
-                    fieldCount = customFieldData.get(Constants.LEVELS).asInt();
+                String error = addCustomFieldToOrg(customFieldId, customFieldData);
+                if (error != null) {
+                    ProjectUtil.returnErrorMsg(error, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                    return response;
                 }
-
-
-                Map<String, Object> customFieldsData;
-
-                if (CollectionUtils.isEmpty(orgList) || StringUtils.isBlank((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA))) {
-                    customFieldsData = new HashMap<>();
-                    List<String> customFieldIds = new ArrayList<>();
-                    customFieldIds.add(fieldIdFromData);
-                    customFieldsData.put(Constants.CUSTOM_FIELD_IDS, customFieldIds);
-                    customFieldsData.put(Constants.CUSTOM_FIELDS_COUNT, fieldCount);
-                } else {
-                    // Update existing organization record
-                    customFieldsData = objectMapper.readValue((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA), Map.class);
-
-                    // If customFieldsData doesn't have proper structure, initialize it
-                    if (!customFieldsData.containsKey(Constants.CUSTOM_FIELD_IDS)) {
-                        customFieldsData.put(Constants.CUSTOM_FIELD_IDS, new ArrayList<String>());
-                    }
-                    if (!customFieldsData.containsKey(Constants.CUSTOM_FIELDS_COUNT)) {
-                        customFieldsData.put(Constants.CUSTOM_FIELDS_COUNT, 0);
-                    }
-                    int currentCount = ((Number) customFieldsData.get(Constants.CUSTOM_FIELDS_COUNT)).intValue();
-
-                    // Check if enabling this field would exceed the limit
-                    if (currentCount + fieldCount > cbServerProperties.getCustomFieldMaxAllowedCount()) {
-                        ProjectUtil.returnErrorMsg(
-                                "Cannot enable this custom field. The maximum limit of " + cbServerProperties.getCustomFieldMaxLevel() + " enabled custom fields would be exceeded.",
-                                HttpStatus.BAD_REQUEST, response, Constants.FAILED);
-                        return response;
-                    }
-
-                    List<String> customFieldIds = (List<String>) customFieldsData.get(Constants.CUSTOM_FIELD_IDS);
-                    // Add the field ID and update the count
-                    if (CollectionUtils.isEmpty(customFieldIds) || !customFieldIds.contains(fieldIdFromData)) {
-                        customFieldIds.add(fieldIdFromData);
-                        customFieldsData.put(Constants.CUSTOM_FIELD_IDS, customFieldIds);
-                        customFieldsData.put(Constants.CUSTOM_FIELDS_COUNT, currentCount + fieldCount);
-                    }
-                }
-
-                Map<String, Object> orgUpdateData = new HashMap<>();
-                orgUpdateData.put(Constants.ID, customFieldData.get(Constants.ORGANIZATION_ID).asText());
-                orgUpdateData.put(Constants.CUSTOM_FIELDS_DATA, objectMapper.writeValueAsString(customFieldsData));
-                cassandraOperation.updateRecord(Constants.KEYSPACE_SUNBIRD, Constants.ORG_TABLE, orgUpdateData);
             } else {
-                Map<String, Object> propertyMap = new HashMap<>();
-                propertyMap.put(Constants.ID, customFieldData.get(Constants.ORGANIZATION_ID).asText());
-                List<Map<String, Object>> orgList = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
-                        Constants.KEYSPACE_SUNBIRD, Constants.ORG_TABLE, propertyMap, Arrays.asList(Constants.CUSTOM_FIELDS_DATA), null);
-
-                if (!CollectionUtils.isEmpty(orgList) && !StringUtils.isBlank((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA))) {
-
-                    Map<String, Object> customFieldsData = objectMapper.readValue((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA), Map.class);
-
-                    // Only proceed if customFieldsData has the expected structure
-                    if (customFieldsData.containsKey(Constants.CUSTOM_FIELD_IDS) && customFieldsData.containsKey(Constants.CUSTOM_FIELDS_COUNT)) {
-                        List<String> customFieldIds = (List<String>) customFieldsData.get(Constants.CUSTOM_FIELD_IDS);
-
-                        // Remove the field ID if it exists
-                        if (!CollectionUtils.isEmpty(customFieldIds) && customFieldIds.contains(customFieldId)) {
-                            customFieldIds.remove(customFieldId);
-                            customFieldsData.put(Constants.CUSTOM_FIELD_IDS, customFieldIds);
-
-                            // Calculate field count using same logic as the enable case
-                            int fieldCount = 1;
-                            if (customFieldData.has(Constants.TYPE) && Constants.MASTER_LIST.equals(customFieldData.get(Constants.TYPE).asText())) {
-                                fieldCount = customFieldData.get(Constants.LEVELS).asInt();
-                            }
-
-                            // Reduce the fields count
-                            int currentCount = ((Number) customFieldsData.get(Constants.CUSTOM_FIELDS_COUNT)).intValue();
-                            customFieldsData.put(Constants.CUSTOM_FIELDS_COUNT, Math.max(0, currentCount - fieldCount));
-
-                            // Update the organization record
-                            Map<String, Object> orgUpdateData = new HashMap<>();
-                            orgUpdateData.put(Constants.ID, customFieldData.get(Constants.ORGANIZATION_ID).asText());
-                            orgUpdateData.put(Constants.CUSTOM_FIELDS_DATA, objectMapper.writeValueAsString(customFieldsData));
-                            cassandraOperation.updateRecord(Constants.KEYSPACE_SUNBIRD, Constants.ORG_TABLE, orgUpdateData);
-                        }
-                    }
-                }
+                removeCustomFieldFromOrg(customFieldId, customFieldData);
             }
 
             ObjectNode customFieldDataNode = (ObjectNode) customFieldData;
@@ -995,6 +934,81 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             log.error("Failed to update custom field status: {}", e.getMessage(), e);
             ProjectUtil.returnErrorMsg("Failed to update custom field status: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, response, Constants.FAILED);
             return response;
+        }
+    }
+
+    private String addCustomFieldToOrg(String customFieldId, JsonNode customFieldData) throws Exception {
+        Map<String, Object> propertyMap = new HashMap<>();
+        propertyMap.put(Constants.ID, customFieldData.get(Constants.ORGANIZATION_ID).asText());
+        List<Map<String, Object>> orgList = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                Constants.KEYSPACE_SUNBIRD, Constants.ORG_TABLE, propertyMap, Arrays.asList(Constants.CUSTOM_FIELDS_DATA), null);
+
+        int fieldCount = 1;
+        if (customFieldData.has(Constants.TYPE) && Constants.MASTER_LIST.equals(customFieldData.get(Constants.TYPE).asText())) {
+            fieldCount = customFieldData.get(Constants.LEVELS).asInt();
+        }
+
+        Map<String, Object> customFieldsData;
+        if (CollectionUtils.isEmpty(orgList) || StringUtils.isBlank((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA))) {
+            customFieldsData = new HashMap<>();
+            List<String> customFieldIds = new ArrayList<>();
+            customFieldIds.add(customFieldId);
+            customFieldsData.put(Constants.CUSTOM_FIELD_IDS, customFieldIds);
+            customFieldsData.put(Constants.CUSTOM_FIELDS_COUNT, fieldCount);
+        } else {
+            customFieldsData = objectMapper.readValue((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA), Map.class);
+            if (!customFieldsData.containsKey(Constants.CUSTOM_FIELD_IDS)) {
+                customFieldsData.put(Constants.CUSTOM_FIELD_IDS, new ArrayList<String>());
+            }
+            if (!customFieldsData.containsKey(Constants.CUSTOM_FIELDS_COUNT)) {
+                customFieldsData.put(Constants.CUSTOM_FIELDS_COUNT, 0);
+            }
+            int currentCount = ((Number) customFieldsData.get(Constants.CUSTOM_FIELDS_COUNT)).intValue();
+            if (currentCount + fieldCount > cbServerProperties.getCustomFieldMaxAllowedCount()) {
+                return "Cannot enable this custom field. The maximum limit of " + cbServerProperties.getCustomFieldMaxLevel() + " enabled custom fields would be exceeded.";
+            }
+            List<String> customFieldIds = (List<String>) customFieldsData.get(Constants.CUSTOM_FIELD_IDS);
+            if (CollectionUtils.isEmpty(customFieldIds) || !customFieldIds.contains(customFieldId)) {
+                customFieldIds.add(customFieldId);
+                customFieldsData.put(Constants.CUSTOM_FIELD_IDS, customFieldIds);
+                customFieldsData.put(Constants.CUSTOM_FIELDS_COUNT, currentCount + fieldCount);
+            }
+        }
+        Map<String, Object> orgUpdateData = new HashMap<>();
+        orgUpdateData.put(Constants.ID, customFieldData.get(Constants.ORGANIZATION_ID).asText());
+        orgUpdateData.put(Constants.CUSTOM_FIELDS_DATA, objectMapper.writeValueAsString(customFieldsData));
+        cassandraOperation.updateRecord(Constants.KEYSPACE_SUNBIRD, Constants.ORG_TABLE, orgUpdateData);
+        return null;
+    }
+
+    // Helper to remove custom field from org table
+    private void removeCustomFieldFromOrg(String customFieldId, JsonNode customFieldData) throws Exception {
+        Map<String, Object> propertyMap = new HashMap<>();
+        propertyMap.put(Constants.ID, customFieldData.get(Constants.ORGANIZATION_ID).asText());
+        List<Map<String, Object>> orgList = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
+                Constants.KEYSPACE_SUNBIRD, Constants.ORG_TABLE, propertyMap, Arrays.asList(Constants.CUSTOM_FIELDS_DATA), null);
+
+        if (!CollectionUtils.isEmpty(orgList) && !StringUtils.isBlank((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA))) {
+            Map<String, Object> customFieldsData = objectMapper.readValue((String) orgList.get(0).get(Constants.CUSTOM_FIELDS_DATA), Map.class);
+            if (customFieldsData.containsKey(Constants.CUSTOM_FIELD_IDS) && customFieldsData.containsKey(Constants.CUSTOM_FIELDS_COUNT)) {
+                List<String> customFieldIds = (List<String>) customFieldsData.get(Constants.CUSTOM_FIELD_IDS);
+                if (!CollectionUtils.isEmpty(customFieldIds) && customFieldIds.contains(customFieldId)) {
+                    customFieldIds.remove(customFieldId);
+                    customFieldsData.put(Constants.CUSTOM_FIELD_IDS, customFieldIds);
+
+                    int fieldCount = 1;
+                    if (customFieldData.has(Constants.TYPE) && Constants.MASTER_LIST.equals(customFieldData.get(Constants.TYPE).asText())) {
+                        fieldCount = customFieldData.get(Constants.LEVELS).asInt();
+                    }
+                    int currentCount = ((Number) customFieldsData.get(Constants.CUSTOM_FIELDS_COUNT)).intValue();
+                    customFieldsData.put(Constants.CUSTOM_FIELDS_COUNT, Math.max(0, currentCount - fieldCount));
+
+                    Map<String, Object> orgUpdateData = new HashMap<>();
+                    orgUpdateData.put(Constants.ID, customFieldData.get(Constants.ORGANIZATION_ID).asText());
+                    orgUpdateData.put(Constants.CUSTOM_FIELDS_DATA, objectMapper.writeValueAsString(customFieldsData));
+                    cassandraOperation.updateRecord(Constants.KEYSPACE_SUNBIRD, Constants.ORG_TABLE, orgUpdateData);
+                }
+            }
         }
     }
 
