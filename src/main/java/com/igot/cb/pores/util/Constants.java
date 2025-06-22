@@ -80,7 +80,7 @@ public class Constants {
     public static final String ONLY_EXCEL_FILES_ALLOWED = "Only Excel files (.xlsx, .xls) are allowed";
     public static final String UPLOADED_FILE_IS_EMPTY = "Uploaded file is empty";
     public static final String EXCEL_HEADER_ROW_REQUIRED = "Excel file must have a header row";
-    public static final String EXCEL_MORE_COLUMNS_THAN_LEVELS = "Excel file has more columns (%d) than defined levels in customFieldData (%d).";
+    public static final String EXCEL_COLUMN_COUNT_MISMATCH = "Excel columns (%d) must exactly match the number of levels defined in the request (%d).";
     public static final String EXCEL_MORE_THAN_MAX_LEVELS = "Excel file cannot have more than %d columns for levels";
     public static final String CUSTOM_FIELD_DATA_LEVELS_EXCEED = "customFieldData levels cannot exceed %d.";
     public static final String CUSTOM_FIELD_DATA_NON_EMPTY = "customFieldData must be a non-empty list";

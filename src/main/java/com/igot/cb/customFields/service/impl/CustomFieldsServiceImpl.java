@@ -173,8 +173,8 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
     }
 
     @Override
-    public ApiResponse updateCustomField(String customFieldId, JsonNode customFieldsData, String token) {
-        log.info("CustomFieldsServiceImpl::updateCustomField: Updating custom field with ID: {}", customFieldId);
+    public ApiResponse updateCustomField(JsonNode customFieldsData, String token) {
+        log.info("CustomFieldsServiceImpl::updateCustomField: Updating customField.");
         ApiResponse response = new ApiResponse("customField.update");
 
         try {
@@ -187,6 +187,8 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                 ProjectUtil.returnErrorMsg(Constants.INVALID_AUTH_TOKEN, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
                 return response;
             }
+
+            String customFieldId = customFieldsData.get(Constants.CUSTOM_FIELD_ID).asText();
 
             // Check if field exists and is active
             Optional<CustomFieldEntity> customFieldOpt = customFieldRepository.findByCustomFiledIdAndIsActiveTrue(customFieldId);
@@ -449,14 +451,13 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             int excelColumns = headerRow.getLastCellNum();
             int jsonLevels = customFieldDataList.size();
 
-            if (excelColumns > jsonLevels) {
+            if (excelColumns != jsonLevels) {
                 ProjectUtil.returnErrorMsg(
-                        String.format(Constants.EXCEL_MORE_COLUMNS_THAN_LEVELS, excelColumns, jsonLevels),
+                        String.format(Constants.EXCEL_COLUMN_COUNT_MISMATCH, excelColumns, jsonLevels),
                         HttpStatus.BAD_REQUEST, response, Constants.FAILED
                 );
                 return response;
             }
-
             if (excelColumns > maxLevel) {
                 ProjectUtil.returnErrorMsg(String.format(Constants.EXCEL_MORE_THAN_MAX_LEVELS, maxLevel), HttpStatus.BAD_REQUEST, response, Constants.FAILED);
                 return response;
@@ -747,14 +748,13 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                 int excelColumns = headerRow.getLastCellNum();
                 int jsonLevels = customFieldDataList.size();
 
-                if (excelColumns > jsonLevels) {
+                if (excelColumns != jsonLevels) {
                     ProjectUtil.returnErrorMsg(
-                            String.format(Constants.EXCEL_MORE_COLUMNS_THAN_LEVELS, excelColumns, jsonLevels),
+                            String.format(Constants.EXCEL_COLUMN_COUNT_MISMATCH, excelColumns, jsonLevels),
                             HttpStatus.BAD_REQUEST, response, Constants.FAILED
                     );
                     return response;
                 }
-
                 if (excelColumns > maxLevel) {
                     ProjectUtil.returnErrorMsg(String.format(Constants.EXCEL_MORE_THAN_MAX_LEVELS, maxLevel), HttpStatus.BAD_REQUEST, response, Constants.FAILED);
                     return response;

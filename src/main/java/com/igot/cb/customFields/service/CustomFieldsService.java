@@ -15,7 +15,7 @@ public interface CustomFieldsService {
 
     ApiResponse readCustomField(String customFieldId, String token);
 
-    ApiResponse updateCustomField(String customFieldId, JsonNode customFieldData, String token);
+    ApiResponse updateCustomField(JsonNode customFieldData, String token);
 
     ApiResponse deleteCustomField(String customFieldId, String token);
 
