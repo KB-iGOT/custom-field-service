@@ -36,12 +36,11 @@ public class CustomFieldsController {
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
-    @PutMapping("/update/{customFieldId}")
+    @PutMapping("/update")
     public ResponseEntity<ApiResponse> updateCustomField(
-            @PathVariable String customFieldId,
             @RequestBody JsonNode customFieldData,
             @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
-        ApiResponse response = customFieldsService.updateCustomField(customFieldId, customFieldData, token);
+        ApiResponse response = customFieldsService.updateCustomField(customFieldData, token);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
