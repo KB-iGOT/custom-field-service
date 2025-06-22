@@ -29,11 +29,15 @@
     },
     "attributeMaxLength": {
       "type": "number"
+    },
+    "organisationId": {
+      "type": "string"
     }
   },
   "required": [
     "type",
-    "customFieldId"
+    "customFieldId",
+    "organisationId"
   ],
   "additionalProperties": false
 }

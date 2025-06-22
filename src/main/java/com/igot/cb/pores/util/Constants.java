@@ -116,7 +116,7 @@ public class Constants {
     public static final String POPUP_STATUS = "popupStatus";
     public static final String ENABLED = "enabled";
     public static final String DISABLED = "disabled";
-
+    public static final String CUSTOM_FIELD_UPDATE_VALIDATION_FILE_PATH = "/payloadValidation/customFieldUpdateValidation.json";
     private Constants() {
     }
 }

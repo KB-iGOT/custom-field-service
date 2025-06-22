@@ -179,7 +179,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
 
         try {
             // Validate payload
-            payloadValidation.validatePayload(cbServerProperties.getCustomFieldValidationFilePath(), customFieldsData);
+            payloadValidation.validatePayload(Constants.CUSTOM_FIELD_UPDATE_VALIDATION_FILE_PATH, customFieldsData);
 
             // Validate user token
             String userId = accessTokenValidator.fetchUserIdFromAccessToken(token);
@@ -239,6 +239,8 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                     customFieldMap,
                     cbServerProperties.getCustomFieldElasticMappingJsonPath()
             );
+
+            removeCustomFieldFromOrg(customFieldId, customFieldsDataObjectNode);
 
             // Update Redis cache
             JsonNode responseNode = objectMapper.valueToTree(customFieldMap);
@@ -426,12 +428,14 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
         int levels;
         List<Row> dataRows = new ArrayList<>();
 
+        Map<String, String> attributeToFieldNameMap = new HashMap<>();
         Map<String, String> nameToAttributeMap = new HashMap<>();
         for (Object fieldMetaObj : customFieldDataList) {
             Map<?, ?> fieldMeta = (Map<?, ?>) fieldMetaObj;
             String name = String.valueOf(fieldMeta.get("name"));
             String attributeName = String.valueOf(fieldMeta.get(Constants.ATTRIBUTE_NAME));
             nameToAttributeMap.put(name, attributeName);
+            attributeToFieldNameMap.put(attributeName, name);
         }
 
         try (InputStream is = file.getInputStream(); Workbook workbook = new XSSFWorkbook(is)) {
@@ -493,7 +497,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
         }
 
         // Use the new method to get both hierarchies
-        Map<String, ArrayNode> hierarchies = parseHierarchyWithReversed(headers, dataRows, levels);
+        Map<String, ArrayNode> hierarchies = parseHierarchyWithReversed(headers, dataRows, levels, attributeToFieldNameMap);
 
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());
         String formattedCurrentTime = getFormattedCurrentTime(currentTime);
@@ -529,7 +533,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
         return response;
     }
 
-    private Map<String, ArrayNode> parseHierarchyWithReversed(String[] headers, List<Row> dataRows, int levels) {
+    private Map<String, ArrayNode> parseHierarchyWithReversed(String[] headers, List<Row> dataRows, int levels, Map<String, String> attributeToFieldNameMap) {
         ArrayNode root = objectMapper.createArrayNode();
         // List of maps for each level to track existing nodes
         List<Map<String, ObjectNode>> levelMaps = new ArrayList<>();
@@ -547,8 +551,12 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                 Cell valueCell = row.getCell(j);
                 String value = (valueCell != null) ? valueCell.toString().trim() : null;
                 if (value == null || value.isEmpty()) break;
-                String fieldName = headers[j];
-                String key = fieldName + ":" + value + (parentFieldName != null ? "|" + parentFieldName + ":" + parentFieldValue : "");
+
+                String attributeName = headers[j];
+                // Get the proper field name from the attribute name
+                String fieldName = attributeToFieldNameMap.getOrDefault(attributeName, attributeName);
+
+                String key = attributeName + ":" + value + (parentFieldName != null ? "|" + parentFieldName + ":" + parentFieldValue : "");
 
                 Map<String, ObjectNode> currentLevelMap = levelMaps.get(j);
                 ObjectNode foundNode = currentLevelMap.get(key);
@@ -557,7 +565,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                     ObjectNode newNode = objectMapper.createObjectNode();
                     newNode.put(Constants.FIELD_NAME, fieldName);
                     newNode.put(Constants.FIELD_VALUE, value);
-                    newNode.put(Constants.FIELD_ATTRIBUTE, fieldName);
+                    newNode.put(Constants.FIELD_ATTRIBUTE, attributeName);
                     if (parentFieldName != null && parentFieldValue != null) {
                         newNode.put(Constants.PARENT_FIELD_NAME, parentFieldName);
                         newNode.put(Constants.PARENT_FIELD_VALUE, parentFieldValue);
@@ -718,12 +726,14 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             int levels;
             List<Row> dataRows = new ArrayList<>();
 
+            Map<String, String> attributeToFieldNameMap = new HashMap<>();
             Map<String, String> nameToAttributeMap = new HashMap<>();
             for (Object fieldMetaObj : customFieldDataList) {
                 Map<?, ?> fieldMeta = (Map<?, ?>) fieldMetaObj;
                 String name = String.valueOf(fieldMeta.get("name"));
                 String attributeName = String.valueOf(fieldMeta.get(Constants.ATTRIBUTE_NAME));
                 nameToAttributeMap.put(name, attributeName);
+                attributeToFieldNameMap.put(attributeName, name);
             }
 
             try (InputStream is = file.getInputStream(); Workbook workbook = new XSSFWorkbook(is)) {
@@ -787,7 +797,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             }
 
             // Use the method to get both hierarchies
-            Map<String, ArrayNode> hierarchies = parseHierarchyWithReversed(headers, dataRows, levels);
+            Map<String, ArrayNode> hierarchies = parseHierarchyWithReversed(headers, dataRows, levels, attributeToFieldNameMap);
 
             if (isEnabled) {
                 try {
@@ -965,7 +975,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             }
             int currentCount = ((Number) customFieldsData.get(Constants.CUSTOM_FIELDS_COUNT)).intValue();
             if (currentCount + fieldCount > cbServerProperties.getCustomFieldMaxAllowedCount()) {
-                return "Cannot enable this custom field. The maximum limit of " + cbServerProperties.getCustomFieldMaxLevel() + " enabled custom fields would be exceeded.";
+                return "Cannot enable this custom field. The maximum limit of " + cbServerProperties.getCustomFieldMaxAllowedCount() + " enabled custom fields would be exceeded.";
             }
             List<String> customFieldIds = (List<String>) customFieldsData.get(Constants.CUSTOM_FIELD_IDS);
             if (CollectionUtils.isEmpty(customFieldIds) || !customFieldIds.contains(customFieldId)) {
