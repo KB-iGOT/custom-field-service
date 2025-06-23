@@ -70,10 +70,24 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                 return response;
             }
 
-            // Create a mutable copy of the JSON data as ObjectNode
+            String errorMessage = validateAttributeNameNotExistsInES(Arrays.asList(customFieldsData.get(Constants.ATTRIBUTE_NAME).asText()), customFieldsData.get(Constants.ORGANIZATION_ID).asText());
+            if (StringUtils.isNotBlank(errorMessage)) {
+                response.getParams().setStatus(Constants.FAILED);
+                response.getParams().setErrMsg(errorMessage);
+                response.setResponseCode(HttpStatus.BAD_REQUEST);
+                return response;
+            }
+
+            Map<String, Object> originalFieldData = new HashMap<>();
+            originalFieldData.put(Constants.NAME, customFieldsData.get(Constants.NAME).asText());
+            originalFieldData.put(Constants.ATTRIBUTE_NAME, customFieldsData.get(Constants.ATTRIBUTE_NAME).asText());
+            List<Map<String, Object>> originalCustomFieldData = new ArrayList<>();
+            originalCustomFieldData.add(originalFieldData);
+
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
             String formattedCurrentTime = getFormattedCurrentTime(currentTime);
             ObjectNode customFieldsDataObjectNode = (ObjectNode) customFieldsData;
+            customFieldsDataObjectNode.putPOJO(Constants.ORIGINAL_CUSTOM_FIELD_DATA, originalCustomFieldData);
             customFieldsDataObjectNode.put(Constants.CREATED_BY, userId);
             customFieldsDataObjectNode.put(Constants.CREATED_ON, formattedCurrentTime);
             customFieldsDataObjectNode.put(Constants.UPDATED_ON, formattedCurrentTime);
@@ -200,18 +214,37 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             CustomFieldEntity customField = customFieldOpt.get();
             JsonNode originalData = customField.getCustomFieldData();
 
-            if(originalData.has(Constants.ORGANISATION_ID) && !originalData.get(Constants.ORGANISATION_ID).asText().equals(customFieldsData.get(Constants.ORGANISATION_ID).asText())) {
+            String attributeName = customFieldsData.get(Constants.ATTRIBUTE_NAME).asText();
+            String organizationId = customFieldsData.get(Constants.ORGANISATION_ID).asText();
+            String errorMessage = validateAttributeNameNotExistsInES(
+                    Arrays.asList(attributeName), organizationId
+            );
+
+            if (StringUtils.isNotBlank(errorMessage) &&
+                    !attributeName.equals(originalData.get(Constants.ATTRIBUTE_NAME).asText())) {
+                ProjectUtil.returnErrorMsg(errorMessage, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
+            if (originalData.has(Constants.ORGANISATION_ID) && !originalData.get(Constants.ORGANISATION_ID).asText().equals(customFieldsData.get(Constants.ORGANISATION_ID).asText())) {
                 ProjectUtil.returnErrorMsg("Organisation ID cannot be changed", HttpStatus.BAD_REQUEST, response, Constants.FAILED);
                 return response;
             }
+
+            ObjectNode customFieldsDataObjectNode = (ObjectNode) customFieldsData;
+            Map<String, Object> originalFieldData = new HashMap<>();
+            originalFieldData.put(Constants.NAME, customFieldsData.get(Constants.NAME).asText());
+            originalFieldData.put(Constants.ATTRIBUTE_NAME, customFieldsData.get(Constants.ATTRIBUTE_NAME).asText());
+            List<Map<String, Object>> originalCustomFieldData = new ArrayList<>();
+            originalCustomFieldData.add(originalFieldData);
+            customFieldsDataObjectNode.putPOJO(Constants.ORIGINAL_CUSTOM_FIELD_DATA, originalCustomFieldData);
 
             // Update entity data
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
             String formattedCurrentTime = getFormattedCurrentTime(currentTime);
 
-            ObjectNode customFieldsDataObjectNode = (ObjectNode) customFieldsData;
             customFieldsDataObjectNode.put(Constants.ORGANISATION_ID, customFieldOpt.get().getCustomFieldData().get(Constants.ORGANISATION_ID).asText());
-            customFieldsDataObjectNode.put(Constants.UPDATED_BY, userId); // Add the updated by field
+            customFieldsDataObjectNode.put(Constants.UPDATED_BY, userId);
             customFieldsDataObjectNode.put(Constants.UPDATED_ON, formattedCurrentTime);
             customFieldsDataObjectNode.put(Constants.IS_ENABLED, false);
             customFieldsDataObjectNode.put(Constants.IS_MANDATORY, customFieldsData.get(Constants.IS_MANDATORY).asBoolean(originalData.get(Constants.IS_MANDATORY).asBoolean()));
@@ -225,7 +258,6 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                 customFieldsDataObjectNode.put(Constants.CREATED_ON, originalData.get(Constants.CREATED_ON).asText());
             }
 
-            // Rest of your existing code...
             customField.setCustomFieldData(customFieldsDataObjectNode);
             customField.setIsMandatory(customFieldsData.get(Constants.IS_MANDATORY).asBoolean(originalData.get(Constants.IS_MANDATORY).asBoolean()));
             customField.setUpdatedOn(currentTime);
@@ -394,6 +426,22 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             return response;
         }
 
+        List<String> attributeNames = new ArrayList<>();
+        Object customFieldDataObj = customFieldsData.get(Constants.CUSTOM_FIELD_DATA);
+        if (customFieldDataObj instanceof List<?> customFieldDataList) {
+            for (Object fieldMetaObj : customFieldDataList) {
+                Map<?, ?> fieldMeta = (Map<?, ?>) fieldMetaObj;
+                attributeNames.add(String.valueOf(fieldMeta.get(Constants.ATTRIBUTE_NAME)));
+            }
+        }
+        String organizationId = String.valueOf(customFieldsData.get(Constants.ORGANIZATION_ID));
+
+        String errorMessage = validateAttributeNameNotExistsInES(attributeNames, organizationId);
+        if (StringUtils.isNotBlank(errorMessage)) {
+            ProjectUtil.returnErrorMsg(errorMessage, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+            return response;
+        }
+
         if (file == null || file.isEmpty()) {
             ProjectUtil.returnErrorMsg(Constants.UPLOADED_FILE_IS_EMPTY, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
             return response;
@@ -412,7 +460,6 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             return response;
         }
 
-        Object customFieldDataObj = customFieldsData.get(Constants.CUSTOM_FIELD_DATA);
         List<?> originalCustomFieldData = (List<?>) customFieldDataObj;
         customFieldsData.put(Constants.LEVELS, originalCustomFieldData.size());
         if (!(customFieldDataObj instanceof List<?> customFieldDataList) || customFieldDataList.isEmpty()) {
@@ -434,7 +481,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
         Map<String, String> nameToAttributeMap = new HashMap<>();
         for (Object fieldMetaObj : customFieldDataList) {
             Map<?, ?> fieldMeta = (Map<?, ?>) fieldMetaObj;
-            String name = String.valueOf(fieldMeta.get("name"));
+            String name = String.valueOf(fieldMeta.get(Constants.NAME));
             String attributeName = String.valueOf(fieldMeta.get(Constants.ATTRIBUTE_NAME));
             nameToAttributeMap.put(name, attributeName);
             attributeToFieldNameMap.put(attributeName, name);
@@ -684,6 +731,22 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                 return response;
             }
 
+            List<String> attributeNames = new ArrayList<>();
+            Object customFieldDataObj = customFieldsData.get(Constants.CUSTOM_FIELD_DATA);
+            if (customFieldDataObj instanceof List<?> customFieldDataList) {
+                for (Object fieldMetaObj : customFieldDataList) {
+                    Map<?, ?> fieldMeta = (Map<?, ?>) fieldMetaObj;
+                    attributeNames.add(String.valueOf(fieldMeta.get(Constants.ATTRIBUTE_NAME)));
+                }
+            }
+            String organizationId = String.valueOf(customFieldsData.get(Constants.ORGANIZATION_ID));
+
+            String errorMessage = validateAttributeNameNotExistsInES(attributeNames, organizationId);
+            if (StringUtils.isNotBlank(errorMessage)) {
+                ProjectUtil.returnErrorMsg(errorMessage, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
             CustomFieldEntity existingCustomField = customFieldOpt.get();
             JsonNode existingData = existingCustomField.getCustomFieldData();
             boolean isEnabled = existingData.has(Constants.IS_ENABLED) &&
@@ -707,7 +770,6 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                 return response;
             }
 
-            Object customFieldDataObj = customFieldsData.get(Constants.CUSTOM_FIELD_DATA);
             if (!(customFieldDataObj instanceof List<?> customFieldDataList) || customFieldDataList.isEmpty()) {
                 ProjectUtil.returnErrorMsg(Constants.CUSTOM_FIELD_DATA_NON_EMPTY, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
                 return response;
@@ -731,7 +793,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             Map<String, String> nameToAttributeMap = new HashMap<>();
             for (Object fieldMetaObj : customFieldDataList) {
                 Map<?, ?> fieldMeta = (Map<?, ?>) fieldMetaObj;
-                String name = String.valueOf(fieldMeta.get("name"));
+                String name = String.valueOf(fieldMeta.get(Constants.NAME));
                 String attributeName = String.valueOf(fieldMeta.get(Constants.ATTRIBUTE_NAME));
                 nameToAttributeMap.put(name, attributeName);
                 attributeToFieldNameMap.put(attributeName, name);
@@ -1065,6 +1127,13 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                 return response;
             }
 
+            // Validation for empty customFieldIds
+            List<String> customFieldIds = (List<String>) customFieldsData.get(Constants.CUSTOM_FIELD_IDS);
+            if (CollectionUtils.isEmpty(customFieldIds)) {
+                ProjectUtil.returnErrorMsg("No custom fields are enabled for Organization ID: " + organizationId, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
+                return response;
+            }
+
             if (customFieldsData.containsKey(Constants.IS_POPUP_ENABLED)) {
                 boolean currentStatus = Boolean.TRUE.equals(customFieldsData.get(Constants.IS_POPUP_ENABLED));
                 if (currentStatus == isEnabled) {
@@ -1119,5 +1188,42 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             str.append("Failed due to missing params - ").append(errList).append(".");
         }
         return str.toString();
+    }
+
+    private String validateAttributeNameNotExistsInES(List<String> attributeNameList, String organizationId) {
+        SearchCriteria searchCriteria = new SearchCriteria();
+        searchCriteria.setFilterCriteriaMap(new HashMap<>());
+        searchCriteria.setRequestedFields(new ArrayList<>());
+        searchCriteria.getRequestedFields().add(Constants.CUSTOM_FIELD_FILTER_ATTRIBUTE);
+        searchCriteria.getFilterCriteriaMap().put(Constants.ORGANIZATION_ID, organizationId);
+        searchCriteria.getFilterCriteriaMap().put(Constants.CUSTOM_FIELD_FILTER_ATTRIBUTE, attributeNameList);
+
+        SearchResult searchResult = esUtilService.searchDocuments(
+                cbServerProperties.getCustomFieldEntity(),
+                searchCriteria,
+                cbServerProperties.getCustomFieldElasticMappingJsonPath()
+        );
+        if (searchResult != null && searchResult.getData() != null && !searchResult.getData().isEmpty()) {
+            Set<String> duplicateNames = new HashSet<>();
+            for (Object dataObj : searchResult.getData()) {
+                if (dataObj instanceof Map) {
+                    Object originalData = ((Map<?, ?>) dataObj).get(Constants.ORIGINAL_CUSTOM_FIELD_DATA);
+                    if (originalData instanceof List) {
+                        for (Object item : (List<?>) originalData) {
+                            if (item instanceof Map) {
+                                Object attr = ((Map<?, ?>) item).get(Constants.ATTRIBUTE_NAME);
+                                if (attr != null && attributeNameList.contains(attr.toString())) {
+                                    duplicateNames.add(attr.toString());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (!duplicateNames.isEmpty()) {
+                return "Custom field(s) with attributeName(s) '" + String.join(", ", duplicateNames) + "' already exist.";
+            }
+        }
+        return null;
     }
 }
