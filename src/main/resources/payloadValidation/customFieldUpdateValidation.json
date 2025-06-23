@@ -35,9 +35,14 @@
     }
   },
   "required": [
-    "type",
     "customFieldId",
-    "organisationId"
+    "type",
+    "name",
+    "organisationId",
+    "attributeName",
+    "isMandatory",
+    "isEnabled",
+    "validation"
   ],
   "additionalProperties": false
 }
