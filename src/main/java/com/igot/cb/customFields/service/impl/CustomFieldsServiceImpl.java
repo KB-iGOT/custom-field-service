@@ -70,11 +70,9 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
                 return response;
             }
 
-            String errorMessage = validateAttributeNameNotExistsInES(Arrays.asList(customFieldsData.get(Constants.ATTRIBUTE_NAME).asText()), customFieldsData.get(Constants.ORGANIZATION_ID).asText());
+            String errorMessage = validateAttributeNameNotExistsInES(Arrays.asList(customFieldsData.get(Constants.ATTRIBUTE_NAME).asText()), customFieldsData.get(Constants.ORGANIZATION_ID).asText(),null);
             if (StringUtils.isNotBlank(errorMessage)) {
-                response.getParams().setStatus(Constants.FAILED);
-                response.getParams().setErrMsg(errorMessage);
-                response.setResponseCode(HttpStatus.BAD_REQUEST);
+                ProjectUtil.returnErrorMsg(errorMessage, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
                 return response;
             }
 
@@ -217,11 +215,10 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             String attributeName = customFieldsData.get(Constants.ATTRIBUTE_NAME).asText();
             String organizationId = customFieldsData.get(Constants.ORGANISATION_ID).asText();
             String errorMessage = validateAttributeNameNotExistsInES(
-                    Arrays.asList(attributeName), organizationId
+                    Arrays.asList(attributeName), organizationId,customFieldId
             );
 
-            if (StringUtils.isNotBlank(errorMessage) &&
-                    !attributeName.equals(originalData.get(Constants.ATTRIBUTE_NAME).asText())) {
+            if (StringUtils.isNotBlank(errorMessage)) {
                 ProjectUtil.returnErrorMsg(errorMessage, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
                 return response;
             }
@@ -436,7 +433,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
         }
         String organizationId = String.valueOf(customFieldsData.get(Constants.ORGANIZATION_ID));
 
-        String errorMessage = validateAttributeNameNotExistsInES(attributeNames, organizationId);
+        String errorMessage = validateAttributeNameNotExistsInES(attributeNames, organizationId, null);
         if (StringUtils.isNotBlank(errorMessage)) {
             ProjectUtil.returnErrorMsg(errorMessage, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
             return response;
@@ -741,7 +738,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             }
             String organizationId = String.valueOf(customFieldsData.get(Constants.ORGANIZATION_ID));
 
-            String errorMessage = validateAttributeNameNotExistsInES(attributeNames, organizationId);
+            String errorMessage = validateAttributeNameNotExistsInES(attributeNames, organizationId, payloadNode.get(Constants.CUSTOM_FIELD_ID).asText());
             if (StringUtils.isNotBlank(errorMessage)) {
                 ProjectUtil.returnErrorMsg(errorMessage, HttpStatus.BAD_REQUEST, response, Constants.FAILED);
                 return response;
@@ -1190,13 +1187,16 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
         return str.toString();
     }
 
-    private String validateAttributeNameNotExistsInES(List<String> attributeNameList, String organizationId) {
+    private String validateAttributeNameNotExistsInES(List<String> attributeNameList, String organizationId, String excludeCustomFieldId) {
         SearchCriteria searchCriteria = new SearchCriteria();
         searchCriteria.setFilterCriteriaMap(new HashMap<>());
         searchCriteria.setRequestedFields(new ArrayList<>());
         searchCriteria.getRequestedFields().add(Constants.CUSTOM_FIELD_FILTER_ATTRIBUTE);
         searchCriteria.getFilterCriteriaMap().put(Constants.ORGANIZATION_ID, organizationId);
         searchCriteria.getFilterCriteriaMap().put(Constants.CUSTOM_FIELD_FILTER_ATTRIBUTE, attributeNameList);
+        if(StringUtils.isNotBlank(excludeCustomFieldId)){
+            searchCriteria.getRequestedFields().add(Constants.CUSTOM_FIELD_ID);
+        }
 
         SearchResult searchResult = esUtilService.searchDocuments(
                 cbServerProperties.getCustomFieldEntity(),
@@ -1206,8 +1206,13 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
         if (searchResult != null && searchResult.getData() != null && !searchResult.getData().isEmpty()) {
             Set<String> duplicateNames = new HashSet<>();
             for (Object dataObj : searchResult.getData()) {
-                if (dataObj instanceof Map) {
-                    Object originalData = ((Map<?, ?>) dataObj).get(Constants.ORIGINAL_CUSTOM_FIELD_DATA);
+                if (dataObj instanceof Map<?, ?> dataMap) {
+                    // Skip if this is the same customFieldId as being updated
+                    Object idObj = dataMap.get(Constants.CUSTOM_FIELD_ID);
+                    if (excludeCustomFieldId != null && excludeCustomFieldId.equals(String.valueOf(idObj))) {
+                        continue;
+                    }
+                    Object originalData = dataMap.get(Constants.ORIGINAL_CUSTOM_FIELD_DATA);
                     if (originalData instanceof List) {
                         for (Object item : (List<?>) originalData) {
                             if (item instanceof Map) {
