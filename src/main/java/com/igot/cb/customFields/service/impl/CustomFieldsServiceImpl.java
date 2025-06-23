@@ -18,10 +18,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -561,6 +558,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
         customField.setCustomFiledId(customFieldId);
         customField.setCustomFieldData(jsonNode);
         customField.setIsActive(true);
+        customField.setIsMandatory(Boolean.TRUE.equals(customFieldsData.get(Constants.IS_MANDATORY)));
         customField.setCreatedOn(currentTime);
         customField.setUpdatedOn(currentTime);
 
@@ -594,7 +592,9 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
 
             for (int j = 0; j < levels; j++) {
                 Cell valueCell = row.getCell(j);
-                String value = (valueCell != null) ? valueCell.toString().trim() : null;
+                DataFormatter dataFormatter = new DataFormatter();
+                // Inside the inner loop, replace value extraction with:
+                String value = (valueCell != null) ? dataFormatter.formatCellValue(valueCell).trim() : null;
                 if (value == null || value.isEmpty()) break;
 
                 String attributeName = headers[j];
@@ -890,13 +890,9 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
             customFieldsData.put(Constants.IS_ENABLED, false);
             customFieldsData.put(Constants.IS_ACTIVE, true);
 
-            // Preserve other important fields if present in existing data
-            if (existingDataNode.has(Constants.IS_MANDATORY)) {
-                customFieldsData.put(Constants.IS_MANDATORY, existingDataNode.get(Constants.IS_MANDATORY).asBoolean());
-            }
-
             JsonNode jsonNode = objectMapper.valueToTree(customFieldsData);
             existingCustomField.setCustomFieldData(jsonNode);
+            existingCustomField.setIsMandatory(Boolean.TRUE.equals(customFieldsData.get(Constants.IS_MANDATORY)));
             existingCustomField.setUpdatedOn(currentTime);
 
             customFieldRepository.save(existingCustomField);
