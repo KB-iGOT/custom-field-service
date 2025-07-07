@@ -78,10 +78,7 @@ class KeyManagerTest {
     void testInit_SuccessfulKeyLoading() throws Exception {
         // Create a mock Path for the test key file
         Path mockKeyPath = mock(Path.class);
-        // Path mockFileName = mock(Path.class);
-        // when(mockKeyPath.getFileName()).thenReturn(mockFileName);
-        // when(mockFileName.toString()).thenReturn(TEST_KEY_ID);
-        
+
         // Mock the Files.walk method
         try (MockedStatic<Files> filesMock = Mockito.mockStatic(Files.class);
              MockedStatic<Paths> pathsMock = Mockito.mockStatic(Paths.class);
@@ -257,7 +254,7 @@ class KeyManagerTest {
     }
 
     @Test
-    void init_shouldHandleExceptionWhenFilesWalkThrows() throws Exception {
+    void init_shouldHandleExceptionWhenFilesWalkThrows() {
         try (MockedStatic<Files> filesMockedStatic = Mockito.mockStatic(Files.class)) {
             // Make Files.walk throw exception
             filesMockedStatic.when(() -> Files.walk(any(Path.class))).thenThrow(new RuntimeException("Walk failed"));

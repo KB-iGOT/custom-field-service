@@ -76,7 +76,7 @@ class Base64UtilTest {
      * This tests the edge case of providing an empty byte array as input.
      */
     @Test
-    public void testEncodeWithZeroLengthInput() {
+    void testEncodeWithZeroLengthInput() {
         byte[] input = new byte[0];
         byte[] result = Base64Util.encode(input, Base64Util.DEFAULT);
         assertNotNull(result);

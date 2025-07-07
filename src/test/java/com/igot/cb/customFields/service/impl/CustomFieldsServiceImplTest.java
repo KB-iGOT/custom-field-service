@@ -83,10 +83,6 @@ class CustomFieldsServiceImplTest {
     @BeforeEach
     void setup() {
         MockitoAnnotations.openMocks(this);
-
-//        //when(cbServerProperties.getCustomFieldValidationFilePath()).thenReturn("validation.json");
-//        when(cbServerProperties.getCustomFieldEntity()).thenReturn("customField");
-//        when(cbServerProperties.getCustomFieldElasticMappingJsonPath()).thenReturn("mapping.json");
     }
 
     @Test
@@ -167,8 +163,6 @@ class CustomFieldsServiceImplTest {
         when(accessTokenValidator.fetchUserIdFromAccessToken("token")).thenReturn("userId");
         when(esUtilService.searchDocuments(any(), any(), any())).thenReturn(null);
 
-//        doThrow(new RuntimeException("DB error")).when(customFieldRepository).save(any());
-
         ApiResponse response = service.createCustomFields(jsonNode, "token");
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getResponseCode());
@@ -183,10 +177,6 @@ class CustomFieldsServiceImplTest {
         // Step 1: mock valid user
         when(accessTokenValidator.fetchUserIdFromAccessToken(token)).thenReturn("userId");
 
-        // Step 2: cache miss
-//        when(cacheService.getCache("CUSTOM_FIELD_" + customFieldId)).thenReturn(null);
-
-        // Step 3: repository returns entity
         CustomFieldEntity entity = mock(CustomFieldEntity.class);
 
         ObjectMapper realObjectMapper = new ObjectMapper();
@@ -222,7 +212,6 @@ class CustomFieldsServiceImplTest {
     @Test
     void readCustomField_notFound() {
         when(accessTokenValidator.fetchUserIdFromAccessToken("token")).thenReturn("userId");
-//        when(cacheService.getCache("CUSTOM_FIELD_id")).thenReturn(null);
         when(customFieldRepository.findByCustomFiledIdAndIsActiveTrue("id")).thenReturn(Optional.empty());
 
         ApiResponse res = service.readCustomField("id", "token");
@@ -350,7 +339,7 @@ class CustomFieldsServiceImplTest {
 
 
     @Test
-    void testFieldEnabledRemoveOrgFails() throws Exception {
+    void testFieldEnabledRemoveOrgFails(){
         when(accessTokenValidator.fetchUserIdFromAccessToken("token")).thenReturn("user");
 
         CustomFieldEntity entity = new CustomFieldEntity();
@@ -380,7 +369,6 @@ class CustomFieldsServiceImplTest {
 
         when(customFieldRepository.findByCustomFiledIdAndIsActiveTrue("cf123")).thenReturn(Optional.of(entity));
         when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(any(), any(), any(), any(), any())).thenReturn(Collections.emptyList());
-//        doThrow(new RuntimeException("fail")).when(cassandraOperation).getRecordsByPropertiesWithoutFiltering(any(), any(), any(), any(), any());
 
         ApiResponse response = service.deleteCustomField("cf123", "token");
 
@@ -428,10 +416,6 @@ class CustomFieldsServiceImplTest {
     @Test
     void testUnexpectedException() {
         when(accessTokenValidator.fetchUserIdFromAccessToken("token")).thenThrow(new RuntimeException("unexpected"));
-//        when(cbServerProperties.getCustomFieldEntity()).thenReturn("customField");
-//        when(cbServerProperties.getCustomFieldElasticMappingJsonPath()).thenReturn("mapping.json");
-
-
         ApiResponse response = service.deleteCustomField("cf123", "token");
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getResponseCode());
@@ -493,12 +477,6 @@ class CustomFieldsServiceImplTest {
 
     @Test
     void testInvalidJson() throws Exception {
-//        when(cbServerProperties.getCustomFieldListValidationFilePath()).thenReturn("validation.json");
-//        when(cbServerProperties.getAllowedExtensions()).thenReturn(".xlsx");
-//        when(cbServerProperties.getAllowedContentTypes()).thenReturn("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-//        when(cbServerProperties.getCustomFieldMaxLevel()).thenReturn(5);
-//        when(cbServerProperties.getCustomFieldEntity()).thenReturn("entity");
-//        when(cbServerProperties.getCustomFieldElasticMappingJsonPath()).thenReturn("mapping.json");
         when(objectMapper.readValue(anyString(), eq(Map.class))).thenThrow(new RuntimeException("bad json"));
 
         ApiResponse response = service.uploadMasterListCustomField(null, "bad-json", "token");
@@ -510,11 +488,6 @@ class CustomFieldsServiceImplTest {
     @Test
     void testInvalidToken_uploadMasterListCustomField() throws Exception {
         when(cbServerProperties.getCustomFieldListValidationFilePath()).thenReturn("validation.json");
-//        when(cbServerProperties.getAllowedExtensions()).thenReturn(".xlsx");
-//        when(cbServerProperties.getAllowedContentTypes()).thenReturn("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-//        when(cbServerProperties.getCustomFieldMaxLevel()).thenReturn(5);
-//        when(cbServerProperties.getCustomFieldEntity()).thenReturn("entity");
-//        when(cbServerProperties.getCustomFieldElasticMappingJsonPath()).thenReturn("mapping.json");
         when(objectMapper.readValue(anyString(), eq(Map.class))).thenReturn(createSampleJsonMap());
         when(objectMapper.valueToTree(any())).thenReturn(null);
         when(accessTokenValidator.fetchUserIdFromAccessToken(anyString())).thenReturn("");
@@ -523,27 +496,10 @@ class CustomFieldsServiceImplTest {
 
         assertEquals(HttpStatus.UNAUTHORIZED, response.getResponseCode());
     }
-//
-//    @Test
-//    void testDuplicateAttributeName() throws Exception {
-//        when(objectMapper.readValue(anyString(), eq(Map.class))).thenReturn(createSampleJsonMap());
-//        when(objectMapper.valueToTree(any())).thenReturn(null);
-//        when(accessTokenValidator.fetchUserIdFromAccessToken(anyString())).thenReturn("user");
-//
-//        CustomFieldsServiceImpl spyService = Mockito.spy(service);
-//        //doReturn("duplicate").when(spyService).validateAttributeNameNotExistsInES(any(), any(), any());
-//
-//        ApiResponse response = spyService.uploadMasterListCustomField(null, "{}", "token");
-//
-//        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
-//    }
 
     @Test
     void testEmptyFile() throws Exception {
         when(cbServerProperties.getCustomFieldListValidationFilePath()).thenReturn("validation.json");
-//        when(cbServerProperties.getAllowedExtensions()).thenReturn(".xlsx");
-//        when(cbServerProperties.getAllowedContentTypes()).thenReturn("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-//        when(cbServerProperties.getCustomFieldMaxLevel()).thenReturn(5);
         when(cbServerProperties.getCustomFieldEntity()).thenReturn("entity");
         when(cbServerProperties.getCustomFieldElasticMappingJsonPath()).thenReturn("mapping.json");
         when(objectMapper.readValue(anyString(), eq(Map.class))).thenReturn(createSampleJsonMap());
@@ -563,7 +519,6 @@ class CustomFieldsServiceImplTest {
         when(cbServerProperties.getCustomFieldListValidationFilePath()).thenReturn("validation.json");
         when(cbServerProperties.getAllowedExtensions()).thenReturn(".xlsx");
         when(cbServerProperties.getAllowedContentTypes()).thenReturn("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-//        when(cbServerProperties.getCustomFieldMaxLevel()).thenReturn(5);
         when(cbServerProperties.getCustomFieldEntity()).thenReturn("entity");
         when(cbServerProperties.getCustomFieldElasticMappingJsonPath()).thenReturn("mapping.json");
 
@@ -578,33 +533,6 @@ class CustomFieldsServiceImplTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
     }
-
-//    @Test
-//    void testLevelsExceed() throws Exception {
-//        when(cbServerProperties.getCustomFieldListValidationFilePath()).thenReturn("validation.json");
-//        when(cbServerProperties.getAllowedExtensions()).thenReturn(".xlsx");
-//        when(cbServerProperties.getAllowedContentTypes()).thenReturn("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-//        when(cbServerProperties.getCustomFieldMaxLevel()).thenReturn(5);
-//        when(cbServerProperties.getCustomFieldEntity()).thenReturn("entity");
-//        when(cbServerProperties.getCustomFieldElasticMappingJsonPath()).thenReturn("mapping.json");
-//
-//        List<Map<String, Object>> cfData = new ArrayList<>();
-//        for (int i = 0; i < 10; i++) {
-//            cfData.add(Map.of(Constants.ATTRIBUTE_NAME, "attr" + i, Constants.NAME, "name" + i, Constants.LEVEL, i+1));
-//        }
-//        createSampleJsonMap().put(Constants.CUSTOM_FIELD_DATA, cfData);
-//
-//        MultipartFile file = validExcelFile(1);
-//
-//        when(objectMapper.readValue(anyString(), eq(Map.class))).thenReturn(createSampleJsonMap());
-//        when(objectMapper.valueToTree(any())).thenReturn(null);
-//        when(accessTokenValidator.fetchUserIdFromAccessToken(anyString())).thenReturn("user");
-//        when(esUtilService.searchDocuments(any(), any(), any())).thenReturn(new SearchResult());
-//
-//        ApiResponse response = service.uploadMasterListCustomField(file, "{}", "token");
-//
-//        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
-//    }
 
     @Test
     void testExcelHeaderMismatch() throws Exception {
@@ -760,8 +688,6 @@ class CustomFieldsServiceImplTest {
         Map<String, Object> jsonMap = realMapper.convertValue(payloadNode, Map.class);
 
         // ObjectMapper behavior
-//        when(objectMapper.createObjectNode()).thenAnswer(inv -> realMapper.createObjectNode());
-//        when(objectMapper.createArrayNode()).thenAnswer(inv -> realMapper.createArrayNode());
         when(objectMapper.valueToTree(any())).thenAnswer(inv -> realMapper.valueToTree(inv.getArgument(0)));
         when(objectMapper.readValue(json, Map.class)).thenReturn(jsonMap);
         when(objectMapper.valueToTree(jsonMap)).thenReturn(payloadNode);
@@ -894,19 +820,8 @@ class CustomFieldsServiceImplTest {
     """; // deliberately broken
         String token = "valid-token";
 
-//        when(multipartFile.getOriginalFilename()).thenReturn("file.xlsx");
-//        when(multipartFile.getContentType()).thenReturn("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-//        when(multipartFile.isEmpty()).thenReturn(false);
-//        when(multipartFile.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[0]));
-
-//        when(cbServerProperties.getAllowedExtensions()).thenReturn(".xlsx");
-//        when(cbServerProperties.getAllowedContentTypes()).thenReturn("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-//        when(cbServerProperties.getCustomFieldMaxLevel()).thenReturn(1);
         when(accessTokenValidator.fetchUserIdFromAccessToken(token)).thenReturn("user1");
 
-
-//        when(customFieldRepository.findByCustomFiledIdAndIsActiveTrue("cf1"))
-//                .thenReturn(Optional.empty());
         // Call the service
         ApiResponse response = service.updateMasterListCustomField(multipartFile, json, token);
 
@@ -956,20 +871,6 @@ class CustomFieldsServiceImplTest {
         assertEquals(HttpStatus.UNAUTHORIZED, response.getResponseCode());
     }
 
-//    @Test
-//    void testUpdateCustomFieldStatus_missingCustomFieldId() {
-//        ObjectNode requestNode = new ObjectMapper().createObjectNode();
-//        requestNode.put(Constants.IS_ENABLED, true);
-//
-//        when(cbServerProperties.getCustomFieldStatusUpdateValidationFilePath()).thenReturn("validation.json");
-//        when(accessTokenValidator.fetchUserIdFromAccessToken("token")).thenReturn("user1");
-//
-//        ApiResponse response = service.updateCustomFieldStatus(requestNode, "token");
-//
-//        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
-//        assertEquals(Constants.FAILED, response.getParams().getStatus());
-//    }
-
     @Test
     void testUpdateCustomFieldStatus_customFieldNotFound() {
         ObjectNode requestNode = new ObjectMapper().createObjectNode();
@@ -1007,35 +908,6 @@ class CustomFieldsServiceImplTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
     }
-
-//    @Test
-//    void testUpdateCustomFieldStatus_addToOrgFails() throws Exception {
-//        ObjectMapper realMapper = new ObjectMapper();
-//        ObjectNode requestNode = realMapper.createObjectNode();
-//        requestNode.put(Constants.CUSTOM_FIELD_ID, "cf1");
-//        requestNode.put(Constants.IS_ENABLED, true);
-//
-//        ObjectNode customFieldData = realMapper.createObjectNode();
-//        customFieldData.put(Constants.IS_ENABLED, false);
-//        customFieldData.put(Constants.ORGANIZATION_ID, "org1");
-//
-//        CustomFieldEntity entity = new CustomFieldEntity();
-//        entity.setCustomFieldData(customFieldData);
-//
-//        when(cbServerProperties.getCustomFieldStatusUpdateValidationFilePath()).thenReturn("validation.json");
-//        when(accessTokenValidator.fetchUserIdFromAccessToken("token")).thenReturn("user1");
-//        when(customFieldRepository.findByCustomFiledIdAndIsActiveTrue("cf1")).thenReturn(Optional.of(entity));
-//
-//        // force addCustomFieldToOrg to fail by mocking cassandraOperation to throw or return a failing condition
-//        when(cassandraOperation.getRecordsByPropertiesWithoutFiltering(any(), any(), any(), any(), any()))
-//                .thenReturn(Collections.emptyList());
-//        when(cbServerProperties.getCustomFieldMaxAllowedCount()).thenReturn(0);
-//
-//        ApiResponse response = service.updateCustomFieldStatus(requestNode, "token");
-//
-//        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
-//        assertEquals(Constants.FAILED, response.getParams().getStatus());
-//    }
 
     @Test
     void testUpdateCustomFieldStatus_exceptionThrown() {

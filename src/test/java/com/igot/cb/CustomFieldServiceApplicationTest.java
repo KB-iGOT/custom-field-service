@@ -8,12 +8,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CustomFieldServiceApplicationTest {
 
-//    @Test
-//    void testMainMethod() {
-//        // This won't start the full context, just checks that main can be invoked
-//        assertDoesNotThrow(() -> CustomFieldServiceApplication.main(new String[]{}));
-//    }
-
     @Test
     void testRestTemplateBeanCreation() {
         CustomFieldServiceApplication app = new CustomFieldServiceApplication();
