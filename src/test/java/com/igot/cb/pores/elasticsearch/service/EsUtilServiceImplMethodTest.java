@@ -83,9 +83,6 @@ class EsUtilServiceImplMethodTest {
         when(elasticsearchClient.search(any(SearchRequest.class), eq(Object.class))).thenReturn(mockResponse);
 
         // Build searchCriteria
-        SearchCriteria searchCriteria = new SearchCriteria();
-        searchCriteria.setPageNumber(0);
-        searchCriteria.setPageSize(10);
         searchCriteria.setRequestedFields(List.of("field"));
         searchCriteria.setFilterCriteriaMap(new HashMap<>());
 
