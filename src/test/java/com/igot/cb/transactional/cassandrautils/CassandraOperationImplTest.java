@@ -114,10 +114,10 @@ class CassandraOperationImplTest {
 
         try (MockedStatic<CassandraUtil> cassandraUtilMockedStatic = Mockito.mockStatic(CassandraUtil.class)) {
             List<Map<String, Object>> expectedResponse = new ArrayList<>();
-            Map<String, Object> record = new HashMap<>();
-            record.put("id", "123");
-            record.put("name", "Test");
-            expectedResponse.add(record);
+            Map<String, Object> recordMap = new HashMap<>();
+            recordMap.put("id", "123");
+            recordMap.put("name", "Test");
+            expectedResponse.add(recordMap);
 
             cassandraUtilMockedStatic.when(() -> CassandraUtil.createResponse(any(ResultSet.class)))
                     .thenReturn(expectedResponse);
@@ -143,10 +143,10 @@ class CassandraOperationImplTest {
 
         try (MockedStatic<CassandraUtil> cassandraUtilMockedStatic = Mockito.mockStatic(CassandraUtil.class)) {
             List<Map<String, Object>> expectedResponse = new ArrayList<>();
-            Map<String, Object> record = new HashMap<>();
-            record.put("id", "123");
-            record.put("name", "Test");
-            expectedResponse.add(record);
+            Map<String, Object> recordMap = new HashMap<>();
+            recordMap.put("id", "123");
+            recordMap.put("name", "Test");
+            expectedResponse.add(recordMap);
 
             cassandraUtilMockedStatic.when(() -> CassandraUtil.createResponse(any(ResultSet.class)))
                     .thenReturn(expectedResponse);
@@ -188,9 +188,6 @@ class CassandraOperationImplTest {
         request.put(Constants.ID, "123");  // Assuming Constants.ID = "id"
         request.put("name", "Updated Name");
         request.put("email", "updated@example.com");
-
-        PreparedStatement mockPreparedStatement = mock(PreparedStatement.class);
-        BoundStatement mockBoundStatement = mock(BoundStatement.class);
 
         when(connectionManager.getSession(keyspaceName)).thenReturn(mockSession);
         when(mockSession.prepare(anyString())).thenReturn(mockPreparedStatement);
