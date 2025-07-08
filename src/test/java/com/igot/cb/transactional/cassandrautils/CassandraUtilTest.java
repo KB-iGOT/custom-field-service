@@ -3,8 +3,6 @@ package com.igot.cb.transactional.cassandrautils;
 import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
-import com.igot.cb.transactional.cassandrautils.CassandraPropertyReader;
-import com.igot.cb.transactional.cassandrautils.CassandraUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;

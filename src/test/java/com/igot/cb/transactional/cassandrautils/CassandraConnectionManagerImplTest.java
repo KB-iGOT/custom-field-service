@@ -89,7 +89,7 @@ class CassandraConnectionManagerImplTest {
     }
 
     @Test
-    void testResourceCleanUp() throws Exception {
+    void testResourceCleanUp() {
         CassandraConnectionManagerImpl.ResourceCleanUp cleanup = new CassandraConnectionManagerImpl.ResourceCleanUp();
 
         Map<String, CqlSession> sessionMap = getStaticSessionMap();
