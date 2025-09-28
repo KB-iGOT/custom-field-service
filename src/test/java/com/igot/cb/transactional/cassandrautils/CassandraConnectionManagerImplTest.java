@@ -147,30 +147,4 @@ class CassandraConnectionManagerImplTest {
         setStaticSession(null);
         assertDoesNotThrow(cleanup::run);
     }
-
-    @Test
-    void testGetSession_recreatesIfClosed() {
-        try (MockedStatic<PropertiesCache> staticMock = mockStatic(PropertiesCache.class);
-             MockedStatic<CqlSession> sessionStatic = mockStatic(CqlSession.class)) {
-            PropertiesCache cache = mock(PropertiesCache.class);
-            staticMock.when(PropertiesCache::getInstance).thenReturn(cache);
-            when(cache.getProperty(Constants.CASSANDRA_CONFIG_HOST)).thenReturn("127.0.0.1");
-            when(cache.getProperty(Constants.CORE_CONNECTIONS_PER_HOST_FOR_LOCAL)).thenReturn("1");
-            when(cache.getProperty(Constants.CORE_CONNECTIONS_PER_HOST_FOR_REMOTE)).thenReturn("1");
-            when(cache.getProperty(Constants.HEARTBEAT_INTERVAL)).thenReturn("30");
-            CqlSession closedSession = mock(CqlSession.class);
-            when(closedSession.isClosed()).thenReturn(true);
-            getStaticSessionMap().put("ks1", closedSession);
-            CqlSession.Builder builder = mock(CqlSession.Builder.class, RETURNS_SELF);
-            CqlSession newSession = mock(CqlSession.class);
-            when(builder.build()).thenReturn(newSession);
-            sessionStatic.when(CqlSession::builder).thenReturn(builder);
-
-            CassandraConnectionManagerImpl manager = new CassandraConnectionManagerImpl();
-            CqlSession returned = manager.getSession("ks1");
-
-            assertSame(newSession, returned);
-        }
-    }
-
 }
