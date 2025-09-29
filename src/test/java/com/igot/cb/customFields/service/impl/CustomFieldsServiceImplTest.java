@@ -84,7 +84,6 @@ class CustomFieldsServiceImplTest {
 
     @BeforeEach
     void setup() {
-        serviceSpy = Mockito.spy(service);
         MockitoAnnotations.openMocks(this);
         if (objectMapper == null) {
             objectMapper = new ObjectMapper();
