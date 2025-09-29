@@ -3,7 +3,6 @@ package com.igot.cb.customFields.service.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cb.authentication.util.AccessTokenValidator;
 import com.igot.cb.customFields.entity.CustomFieldEntity;
@@ -82,9 +81,6 @@ class CustomFieldsServiceImplTest {
 
     @Captor
     private ArgumentCaptor<CustomFieldEntity> entityCaptor;
-
-    private CustomFieldsServiceImpl serviceSpy;
-
 
     @BeforeEach
     void setup() {
