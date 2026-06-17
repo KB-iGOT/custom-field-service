@@ -1,10 +1,13 @@
 package com.igot.cb.customFields.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.igot.cb.authentication.util.AccessTokenValidator;
 import com.igot.cb.customFields.service.CustomFieldsService;
 import com.igot.cb.pores.elasticsearch.dto.SearchCriteria;
 import com.igot.cb.pores.util.ApiResponse;
 import com.igot.cb.pores.util.Constants;
+import com.igot.cb.pores.util.ProjectUtil;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -15,11 +18,17 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletRequest;
 import java.util.Map;
 
+import static com.igot.cb.pores.util.Constants.UNAUTHORIZED;
+import static com.igot.cb.pores.util.ProjectUtil.returnErrorMsg;
+
 @RestController
 @RequestMapping("/customFields/v1")
 public class CustomFieldsController {
     @Autowired
     private CustomFieldsService customFieldsService;
+
+    @Autowired
+    private AccessTokenValidator accessTokenValidator;
 
     @PostMapping("/create")
     public ResponseEntity<ApiResponse> createCustomFields(@RequestBody JsonNode customFieldsData,
@@ -53,9 +62,9 @@ public class CustomFieldsController {
     }
 
     @PostMapping("/search")
-    public ResponseEntity<ApiResponse> searchCustomFields(
-            @RequestBody SearchCriteria searchCriteria) {
-        ApiResponse response = customFieldsService.searchCustomFields(searchCriteria);
+    public ResponseEntity<ApiResponse> searchAdminCustomFields(
+            @RequestBody SearchCriteria searchCriteria,@RequestHeader(Constants.X_AUTH_USER_ORG_ID)String userOrgId) {
+        ApiResponse response = customFieldsService.searchCustomFields(searchCriteria,userOrgId,true);
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 
@@ -90,6 +99,21 @@ public class CustomFieldsController {
             @RequestBody Map<String, Object> popupStatusData,
             @RequestHeader(Constants.X_AUTH_TOKEN) String token) {
         ApiResponse response = customFieldsService.updatePopupStatus(popupStatusData, token);
+        return new ResponseEntity<>(response, response.getResponseCode());
+    }
+
+    @PostMapping("/user/search")
+    public ResponseEntity<ApiResponse> searchUserCustomFields(
+            @RequestBody SearchCriteria searchCriteria,@RequestHeader(Constants.X_AUTH_TOKEN) String authToken,
+            @RequestHeader(Constants.X_AUTH_USER_ORG_ID)String userOrgId) {
+        ApiResponse response = ProjectUtil.createDefaultResponse("") ;
+        String userId = accessTokenValidator.fetchUserIdFromAccessToken(authToken);
+
+        if (StringUtils.isNotBlank(userId)){
+            response = customFieldsService.searchCustomFields(searchCriteria,userOrgId,false);
+        }else{
+            returnErrorMsg(UNAUTHORIZED,HttpStatus.UNAUTHORIZED, response,Constants.FAILED);
+        }
         return new ResponseEntity<>(response, response.getResponseCode());
     }
 }
