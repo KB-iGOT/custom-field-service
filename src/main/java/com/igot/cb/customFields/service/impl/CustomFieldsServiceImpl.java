@@ -3,6 +3,7 @@ package com.igot.cb.customFields.service.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.igot.cb.authentication.util.AccessTokenValidator;
 import com.igot.cb.customFields.entity.CustomFieldEntity;
 import com.igot.cb.customFields.repository.CustomFieldRepository;
@@ -17,7 +18,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -369,12 +369,19 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
     }
 
     @Override
-    public ApiResponse searchCustomFields(SearchCriteria searchCriteria) {
+    public ApiResponse searchCustomFields(SearchCriteria searchCriteria,String userOrgId,boolean isAdmin) {
         log.info("CustomFieldsServiceImpl::searchCustomFields: Searching custom fields");
         ApiResponse response = new ApiResponse("customField.search");
 
         try {
 
+            if (isAdmin && StringUtils.isNotBlank(userOrgId)) {
+                if (searchCriteria.getFilterCriteriaMap().containsKey(Constants.ORGANISATION_ID) &&
+                        !StringUtils.equalsIgnoreCase( userOrgId,(String)searchCriteria.getFilterCriteriaMap().get(Constants.ORGANISATION_ID))) {
+                    ProjectUtil.returnErrorMsg(Constants.INVALID_ORGDATA_ACCESS, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
+                    return  response;
+                }
+            }
             // Default to active records if not specified
             if (!searchCriteria.getFilterCriteriaMap().containsKey(Constants.IS_ACTIVE)) {
                 searchCriteria.getFilterCriteriaMap().put(Constants.IS_ACTIVE, true);

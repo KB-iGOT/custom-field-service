@@ -28,6 +28,7 @@ public class Constants {
     public static final String DOT_SEPARATOR = ".";
     public static final String SHA_256_WITH_RSA = "SHA256withRSA";
     public static final String UNAUTHORIZED = "Unauthorized";
+    public static final String INVALID_ORGDATA_ACCESS = "User is not authorized to access the selected org Details";
     public static final String SUB = "sub";
     public static final String SSO_URL = "sso.url";
     public static final String SSO_REALM = "sso.realm";
@@ -60,6 +61,7 @@ public class Constants {
     public static final String REDIS_CONNECTION_FACTORY = "redisConnectionFactory";
     public static final String EXCEPTION_MSG_DELETE = "Exception occurred while deleting record from ";
     public static final String X_AUTH_TOKEN = "x-authenticated-user-token";
+    public static final String X_AUTH_USER_ORG_ID = "x-authenticated-user-orgid";
     public static final String NUMBER = "number";
     public static final String TYPE = "type";
     public static final String LONG = "long";
