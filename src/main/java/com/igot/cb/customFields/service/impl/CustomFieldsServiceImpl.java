@@ -375,7 +375,7 @@ public class CustomFieldsServiceImpl implements CustomFieldsService {
 
         try {
 
-            if (isAdmin && StringUtils.isNotBlank(userOrgId)) {
+            if (!isAdmin && StringUtils.isNotBlank(userOrgId)) {
                 if (searchCriteria.getFilterCriteriaMap().containsKey(Constants.ORGANISATION_ID) &&
                         !StringUtils.equalsIgnoreCase( userOrgId,(String)searchCriteria.getFilterCriteriaMap().get(Constants.ORGANISATION_ID))) {
                     ProjectUtil.returnErrorMsg(Constants.INVALID_ORGDATA_ACCESS, HttpStatus.UNAUTHORIZED, response, Constants.FAILED);
