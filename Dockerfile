@@ -1,4 +1,4 @@
-FROM FROM eclipse-temurin:17.0.21.1_2-jdk
+FROM eclipse-temurin:17.0.21.1_2-jdk
 
 RUN useradd -ms /bin/bash appuser
 
