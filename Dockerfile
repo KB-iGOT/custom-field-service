@@ -1,21 +1,24 @@
+
 FROM eclipse-temurin:17.0.21.1_2-jdk
 
 RUN useradd -ms /bin/bash appuser
 
 RUN apt-get update \
-    && apt-get install -y \
+    && apt-get install -y --no-install-recommends \
         curl \
         libxrender1 \
-        libjpeg62-turbo \
+        libjpeg-turbo8 \
         fontconfig \
         libxtst6 \
         xfonts-75dpi \
         xfonts-base \
-        xz-utils
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY custom-field-service-0.0.1-SNAPSHOT.jar /opt/
 
 RUN chown -R appuser:appuser /opt
+
 USER appuser
 WORKDIR /opt
 
